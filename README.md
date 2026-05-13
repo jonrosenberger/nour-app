@@ -128,20 +128,48 @@ Additional architecture decisions are being documented as the project evolves.
 
 ---
 
+## Running Locally
+
+```bash
+npm install
+npm run dev
+```
+
+Then open the local Vite URL shown in terminal.
+
+---
+
+## Requirements
+
+- Node.js 20+
+- npm
+
 ## Current Status
 
-Nour is currently an active prototype under development.
+The core check-in flow, local storage system, and trend visualization are currently functional in the prototype.
 
-Current areas of focus include:
-- visual polish
+Current development priorities include:
 - mobile responsiveness
 - export systems
 - accessibility improvements
-- interaction refinement
 - onboarding flow
-- long-term maintainability
+- interaction refinement
 
 ---
+
+## Key Design Decisions
+
+### Local-first architecture
+User emotional data remains on-device by default.
+
+### No streak mechanics
+The app intentionally avoids engagement systems that create guilt or pressure around missed days.
+
+### Subjective baseline tracking
+Nour avoids universal emotional scoring and instead encourages users to track changes relative to their own lived experience.
+
+### Trend-focused visualization
+The app emphasizes long-term patterns over isolated difficult days.
 
 ## Roadmap Highlights
 
@@ -161,22 +189,29 @@ The project remains intentionally cautious about introducing features that could
 
 ## Development Philosophy
 
-This project is heavily informed by iterative UX thinking and AI-assisted development workflows.
+I come from a customer support and operations background rather than a traditional software engineering one. Building Nour has been a way to push my own boundaries while also finding out what's actually possible when someone with that kind of background can build and iterate on software directly using AI as a development partner.
 
-AI tools are used as collaborative accelerators for:
-- prototyping
-- iteration
-- troubleshooting
-- architecture exploration
-- interface refinement
+A lot of the value I bring to the project comes from things I already spent years doing professionally:
+- understanding where users get frustrated
+- identifying friction before it becomes a problem
+- thinking through edge cases and future scalability
+- designing around blockers that stop people from actually using a tool consistently
+- balancing feature ideas against complexity and usability
 
-Human judgment remains central to:
-- ethical decisions
-- UX direction
-- emotional framing
-- product philosophy
-- prioritization
+AI dramatically speeds up implementation and iteration. The direction of the product still comes from human judgment, lived experience, and constant review.
 
+For example:
+- local-first storage was a deliberate privacy decision
+- the app intentionally avoids streak mechanics and engagement pressure
+- the check-in flow is designed to minimize emotional friction and cognitive overload
+- trend visualization is prioritized over isolated bad days to reduce emotional overreaction
+
+The workflow itself is highly iterative:
+identify a problem, define constraints, prototype quickly, review critically, refine, and repeat.
+
+AI is very good at accelerating the build process. My role is making sure the end result actually feels thoughtful, sustainable, and usable by real people.
+
+Nour is both a product and an ongoing exploration of what AI-assisted development can look like when guided by strong human direction rather than pure automation.
 ---
 
 ## License
