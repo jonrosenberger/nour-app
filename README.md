@@ -1,5 +1,4 @@
 # Nour
-
 > Healing Has Curves. Follow trends, not moments.
 
 Nour is a local-first mood and wellbeing tracking app focused on privacy, emotional nuance, and long-term trends instead of daily judgment.
@@ -14,7 +13,7 @@ Nour is designed to feel calm, observational, and human.
 
 ## Version
 
-Current prototype: v0.4.0 — Mobile First Build
+Current prototype: v0.4.2 — Mobile Stabilization
 
 ---
 
@@ -29,9 +28,10 @@ Nour is built around a few guiding principles:
 - Mental health tools should avoid addiction mechanics
 
 The app intentionally avoids:
+
 - AI-generated diagnoses
 - AI emotional interpretation
-- “Wellness streak” pressure
+- "Wellness streak" pressure
 - Emotional ranking systems
 - Manipulative engagement loops
 - Advertising and surveillance models
@@ -45,9 +45,10 @@ The app intentionally avoids:
 Users record subjective emotional and behavioral data through a lightweight daily flow.
 
 Current tracking categories include:
+
 - Mood baseline
 - Energy
-- Sleep
+- Self-talk
 
 Additional categories are planned as optional future toggles.
 
@@ -58,6 +59,7 @@ Additional categories are planned as optional future toggles.
 ### Trend-Based Visualization
 
 Instead of focusing on single entries, Nour emphasizes patterns over time through:
+
 - moving averages
 - trend lines
 - long-term emotional visualization
@@ -85,6 +87,7 @@ Users remain in control of their information.
 Nour supports optional reflection and discussion with therapists or trusted support systems through clean printable exports.
 
 Exports focus on:
+
 - visual trends
 - optional notes
 - non-interpretive summaries
@@ -96,12 +99,14 @@ The app intentionally avoids diagnostic conclusions or automated emotional analy
 ## Design Goals
 
 Nour is intentionally designed to feel:
+
 - calm
 - lightweight
 - reflective
 - emotionally nonjudgmental
 
 UX priorities include:
+
 - low-friction check-ins
 - intentionally optional skips
 - simple visual hierarchy
@@ -114,11 +119,12 @@ UX priorities include:
 
 ## Why This Project Exists
 
-Many existing mental health apps optimize for retention, monetization, or “daily streak” engagement. This can quickly create emotional pressure, distrust, and burnout.
+Many existing mental health apps optimize for retention, monetization, or "daily streak" engagement. This can quickly create emotional pressure, distrust, and burnout.
 
 Nour is being built specifically to avoid those pressures and instead provide a calm tool for observing emotional trends over time.
 
 The project is also an exploration of:
+
 - ethical product design
 - AI-assisted development workflows
 - local-first application architecture
@@ -129,10 +135,10 @@ The project is also an exploration of:
 ## Tech Stack
 
 Current prototype stack:
+
 - React
 - Vite
-- Recharts
-- Framer Motion
+- Lucide React (icons)
 
 ---
 
@@ -141,3 +147,4 @@ Current prototype stack:
 ```bash
 npm install
 npm run dev
+```

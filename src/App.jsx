@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import "./App.css";
 import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
   CalendarDays,
-  Compass,
   Check,
   Download,
   FileText,
@@ -44,9 +44,18 @@ const APP_CONFIG = {
   storageKey: "nour_entries_v1",
   exportFilePrefix: "nour-export",
   schemaVersion: 1,
+  dayOneAnimationSeenKey: "nour_day1_animation_seen_v1",
 };
 
-const FIELDS = [
+
+
+const FEATURE_FLAGS = {
+  enforceBackdatingLimit: false,
+  maxBackdateDays: 3,
+  tagsInCheckin: false, // V2+: feelings/events tag steps. Set true to re-enable in check-in flow.
+};
+
+const TRACKERS = [
   {
     key: "mood",
     label: "Mood",
@@ -58,6 +67,7 @@ const FIELDS = [
     right: "Very good",
     icon: Heart,
     color: "#ec4899",
+    enabledInV1: true,
   },
   {
     key: "energy",
@@ -70,6 +80,7 @@ const FIELDS = [
     right: "Very energized",
     icon: Zap,
     color: "#f59e0b",
+    enabledInV1: true,
   },
   {
     key: "calm",
@@ -82,6 +93,7 @@ const FIELDS = [
     right: "Very calm",
     icon: Sparkles,
     color: "#38bdf8",
+    enabledInV1: false,
   },
   {
     key: "selfTalk",
@@ -94,6 +106,7 @@ const FIELDS = [
     right: "Supportive",
     icon: FileText,
     color: "#fb7185",
+    enabledInV1: true,
   },
   {
     key: "connection",
@@ -106,6 +119,7 @@ const FIELDS = [
     right: "Supported",
     icon: Sparkles,
     color: "#a78bfa",
+    enabledInV1: false,
   },
   {
     key: "rest",
@@ -118,8 +132,13 @@ const FIELDS = [
     right: "Restored",
     icon: Moon,
     color: "#34d399",
+    enabledInV1: false,
   },
 ];
+
+const ACTIVE_FIELDS = TRACKERS.filter((field) => field.enabledInV1);
+const FIELDS = ACTIVE_FIELDS;
+
 
 const FEELING_GROUPS = [
   { title: "Low / Foggy", colorClass: "tag-low", tags: ["cloudy", "empty", "numb", "sad", "heavy", "foggy", "lonely"] },
@@ -162,20 +181,46 @@ function addDaysISO(dateISO, amount) {
 }
 
 function uid() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function migrateEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+
+  return entries
+    .filter((entry) => entry && typeof entry === "object" && entry.date)
+    .map((entry) => ({
+      ...entry,
+      schemaVersion: APP_CONFIG.schemaVersion,
+      fields: { ...(entry.fields || {}) },
+      skippedFields: { ...DEFAULT_SKIPPED, ...(entry.skippedFields || {}) },
+      feelings: Array.isArray(entry.feelings) ? entry.feelings : [],
+      events: Array.isArray(entry.events) ? entry.events : [],
+      note: entry.note || "",
+      includeNotesInExport: entry.includeNotesInExport ?? true,
+    }));
 }
 
 function loadEntries() {
   try {
     const raw = localStorage.getItem(APP_CONFIG.storageKey);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? migrateEntries(JSON.parse(raw)) : [];
   } catch {
     return [];
   }
 }
 
 function saveEntries(entries) {
-  localStorage.setItem(APP_CONFIG.storageKey, JSON.stringify(entries));
+  try {
+    localStorage.setItem(APP_CONFIG.storageKey, JSON.stringify(entries));
+    return { ok: true };
+  } catch (error) {
+    console.error("Unable to save Nour entries", error);
+    return { ok: false, error };
+  }
 }
 
 function fieldLabel(value, field) {
@@ -188,7 +233,7 @@ function fieldLabel(value, field) {
 }
 
 function compositeFromFields(fields) {
-  const answered = FIELDS.map((field) => fields[field.key]).filter((value) => typeof value === "number");
+  const answered = ACTIVE_FIELDS.map((field) => fields[field.key]).filter((value) => typeof value === "number");
   if (!answered.length) return null;
   return Math.round(answered.reduce((sum, value) => sum + value, 0) / answered.length);
 }
@@ -203,9 +248,8 @@ function movingAverage(rows, key, windowSize) {
   });
 }
 
-function buildChartRows(entries, rangeMode, customStart, customEnd) {
+function buildChartRows(entries, rangeMode, customStart, customEnd, today) {
   const sorted = entries.slice().sort((a, b) => a.date.localeCompare(b.date));
-  const today = todayISO();
   const selected = RANGE_OPTIONS.find((range) => range.key === rangeMode);
   let start = null;
   let end = today;
@@ -234,6 +278,7 @@ function buildChartRows(entries, rangeMode, customStart, customEnd) {
   return movingAverage(rows, "composite", rangeMode === "week" ? 3 : 7);
 }
 
+// V2 analytics scaffold: retained for future tag/context views, but not a V1 primary feature.
 function countTags(entries, rangeRows, type) {
   const dates = new Set(rangeRows.map((row) => row.date));
   const counts = new Map();
@@ -275,7 +320,7 @@ function makePath(points) {
   return valid.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
 }
 
-function MoodChart({ rows, visible, setVisible }) {
+function MoodChart({ rows, visible, setVisible, animateDayOne }) {
   const width = 1080;
   const height = 520;
   const pad = { top: 42, right: 30, bottom: 60, left: 62 };
@@ -343,10 +388,14 @@ function MoodChart({ rows, visible, setVisible }) {
           })}
 
           {dayOneRow ? (
-            <g className="day-one-marker" transform={`translate(${dayOneX} ${dayOneY})`}>
+            <g className={animateDayOne ? "day-one-marker animate" : "day-one-marker"} transform={`translate(${dayOneX} ${dayOneY})`}>
               <circle className="day-one-ring" r="26" fill="none" stroke="#5f7d68" strokeWidth="3" />
               <circle r="14" fill="#eef3ec" stroke="#243028" strokeWidth="3" />
-              <Compass className="day-one-compass" x="-10" y="-10" width="20" height="20" color="#243028" strokeWidth="2.4" />
+              <g className="day-one-compass">
+                <circle r="9" fill="none" stroke="#243028" strokeWidth="2" />
+                <polygon points="0,-6 2,-1 -2,-1" fill="#c07a4a" />
+                <polygon points="0,6 2,1 -2,1" fill="#243028" />
+              </g>
               <line className="day-one-needle" x1="0" y1="0" x2="0" y2="-11" stroke="#c07a4a" strokeWidth="3" strokeLinecap="round" />
               <text className="day-one-label" x="0" y="48" textAnchor="middle">Day 1. Start of my journey.</text>
             </g>
@@ -430,8 +479,14 @@ function SliderStep({ field, value, skipped, onValue, onSkip, onUnskip }) {
       <p className="eyebrow">{field.label}</p>
       <h1>{field.prompt}</h1>
       <div className="step-value">{skipped ? "Skipped" : fieldLabel(value, field)}</div>
-      <input className="range jumbo" type="range" min="0" max="100" value={value} disabled={skipped} onChange={(e) => onValue(field.key, Number(e.target.value))} aria-label={field.prompt} />
-      <div className="range-labels"><span>{field.left}</span><span>{field.midLeft}</span><span>{field.center}</span><span>{field.midRight}</span><span>{field.right}</span></div>
+      <div className="slider-track-wrap">
+        <input className="range jumbo" type="range" min="0" max="100" value={value} disabled={skipped} onChange={(e) => onValue(field.key, Number(e.target.value))} aria-label={field.prompt} />
+        <div className="range-labels">
+          {[field.left, field.midLeft, field.center, field.midRight, field.right].map((label, i) => (
+            <span key={i} style={{ left: `${i * 25}%` }}>{label}</span>
+          ))}
+        </div>
+      </div>
       <div className="step-actions-inline">
         {skipped ? <Button variant="secondary" onClick={() => onUnskip(field.key)}>Answer this field</Button> : <Button variant="secondary" onClick={() => onSkip(field.key)}><SkipForward size={16} /> Skip this field</Button>}
       </div>
@@ -469,7 +524,8 @@ function NotesStep({ note, setNote, includeNotesInExport, setIncludeNotesInExpor
 
 function CheckInPage({ date, setDate, draft, setDraft, existingEntry, onSave, onCancel, saveState }) {
   const [step, setStep] = useState(0);
-  const totalSteps = FIELDS.length + 3;
+  const tagStepCount = FEATURE_FLAGS.tagsInCheckin ? 2 : 0;
+  const totalSteps = FIELDS.length + tagStepCount + 1;
   const currentField = FIELDS[step];
 
   function updateValue(key, value) {
@@ -491,10 +547,11 @@ function CheckInPage({ date, setDate, draft, setDraft, existingEntry, onSave, on
       <div className="date-row checkin-date"><label>Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label></div>
 
       {currentField && <SliderStep field={currentField} value={draft.fields[currentField.key] ?? 50} skipped={draft.skippedFields[currentField.key]} onValue={updateValue} onSkip={skipField} onUnskip={unskipField} />}
-      {step === FIELDS.length && <TagGroupPicker title="Feelings" subtitle="Click any that fit. These labels do not affect the chart score." groups={FEELING_GROUPS} selected={draft.feelings} setSelected={(fn) => setDraft((prev) => ({ ...prev, feelings: typeof fn === "function" ? fn(prev.feelings) : fn }))} />}
-      {step === FIELDS.length + 1 && <TagGroupPicker title="Events" subtitle="Optional context for memory or export. These do not affect the chart score." groups={EVENT_GROUPS} selected={draft.events} setSelected={(fn) => setDraft((prev) => ({ ...prev, events: typeof fn === "function" ? fn(prev.events) : fn }))} />}
-      {step === FIELDS.length + 2 && <NotesStep note={draft.note} setNote={(note) => setDraft((prev) => ({ ...prev, note }))} includeNotesInExport={draft.includeNotesInExport} setIncludeNotesInExport={(includeNotesInExport) => setDraft((prev) => ({ ...prev, includeNotesInExport }))} />}
+      {FEATURE_FLAGS.tagsInCheckin && step === FIELDS.length && <TagGroupPicker title="Feelings" subtitle="Click any that fit. These labels do not affect the chart score." groups={FEELING_GROUPS} selected={draft.feelings} setSelected={(fn) => setDraft((prev) => ({ ...prev, feelings: typeof fn === "function" ? fn(prev.feelings) : fn }))} />}
+      {FEATURE_FLAGS.tagsInCheckin && step === FIELDS.length + 1 && <TagGroupPicker title="Events" subtitle="Optional context for memory or export. These do not affect the chart score." groups={EVENT_GROUPS} selected={draft.events} setSelected={(fn) => setDraft((prev) => ({ ...prev, events: typeof fn === "function" ? fn(prev.events) : fn }))} />}
+      {step === FIELDS.length + tagStepCount && <NotesStep note={draft.note} setNote={(note) => setDraft((prev) => ({ ...prev, note }))} includeNotesInExport={draft.includeNotesInExport} setIncludeNotesInExport={(includeNotesInExport) => setDraft((prev) => ({ ...prev, includeNotesInExport }))} />}
 
+      {saveState === "error" && <p className="save-error">Nour could not save this entry. Your browser storage may be full or unavailable.</p>}
       <div className="step-nav">
         <Button variant="secondary" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}><ArrowLeft size={16} /> Back</Button>
         {step < totalSteps - 1 ? <Button onClick={() => setStep((s) => Math.min(totalSteps - 1, s + 1))}>Next <ArrowRight size={16} /></Button> : <Button onClick={onSave}><Save size={16} /> {saveState === "saved" ? "Saved" : existingEntry ? "Save changes" : "Save entry"}</Button>}
@@ -536,7 +593,7 @@ function buildEntry(date, draft, existing) {
   };
 }
 
-function ExportPrintable({ rows, entries, rangeLabel, includeNotes }) {
+function buildExportHTML({ rows, entries, rangeLabel, includeNotes }) {
   const width = 900;
   const height = 420;
   const pad = { top: 40, right: 30, bottom: 60, left: 56 };
@@ -580,16 +637,38 @@ export default function App() {
   const [visible, setVisible] = useState(DEFAULT_VISIBLE);
   const [saveState, setSaveState] = useState("idle");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [exportIncludeNotes, setExportIncludeNotes] = useState(true);
+  const [currentToday, setCurrentToday] = useState(todayISO());
+  const [dayOneAnimationSeen, setDayOneAnimationSeen] = useState(() => localStorage.getItem(APP_CONFIG.dayOneAnimationSeenKey) === "true");
 
   const existingEntry = entries.find((entry) => entry.date === date);
   const [draft, setDraft] = useState(() => buildDraftFromEntry(existingEntry));
 
-  const chartRows = useMemo(() => buildChartRows(entries, rangeMode, customStart, customEnd), [entries, rangeMode, customStart, customEnd]);
+  const chartRows = useMemo(() => buildChartRows(entries, rangeMode, customStart, customEnd, currentToday), [entries, rangeMode, customStart, customEnd, currentToday]);
   const feelingCounts = useMemo(() => countTags(entries, chartRows, "feelings"), [entries, chartRows]);
   const eventCounts = useMemo(() => countTags(entries, chartRows, "events"), [entries, chartRows]);
+  const shouldAnimateDayOne = chartRows.length === 1 && typeof chartRows[0]?.composite === "number" && !dayOneAnimationSeen;
 
-  function startCheckIn() {
-    const existing = entries.find((entry) => entry.date === date);
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const nextToday = todayISO();
+      setCurrentToday((previous) => (previous === nextToday ? previous : nextToday));
+    }, 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!shouldAnimateDayOne) return;
+    const timeout = window.setTimeout(() => {
+      localStorage.setItem(APP_CONFIG.dayOneAnimationSeenKey, "true");
+      setDayOneAnimationSeen(true);
+    }, 1600);
+    return () => window.clearTimeout(timeout);
+  }, [shouldAnimateDayOne]);
+
+  function startCheckIn(targetDate = date) {
+    setDate(targetDate);
+    const existing = entries.find((entry) => entry.date === targetDate);
     setDraft(buildDraftFromEntry(existing));
     setSaveState("idle");
     setPage("checkin");
@@ -606,35 +685,44 @@ export default function App() {
     const existing = entries.find((entry) => entry.date === date);
     const nextEntry = buildEntry(date, draft, existing);
     const nextEntries = [...entries.filter((entry) => entry.date !== date), nextEntry].sort((a, b) => a.date.localeCompare(b.date));
+    const result = saveEntries(nextEntries);
+    if (!result.ok) {
+      setSaveState("error");
+      return;
+    }
     setEntries(nextEntries);
-    saveEntries(nextEntries);
     setSaveState("saved");
     window.setTimeout(() => setPage("home"), 450);
   }
 
   function clearEntries() {
+    const confirmed = window.confirm("Clear all local Nour data on this device? This cannot be undone.");
+    if (!confirmed) return;
+
+    const result = saveEntries([]);
+    if (!result.ok) {
+      window.alert("Nour could not clear local data. Please try again.");
+      return;
+    }
     setEntries([]);
-    saveEntries([]);
   }
 
   function exportPdf() {
     const label = RANGE_OPTIONS.find((range) => range.key === rangeMode)?.label || "Selected range";
-    const includeNotes = entries.some((entry) => entry.includeNotesInExport !== false);
-    const html = ExportPrintable({ rows: chartRows, entries, rangeLabel: label, includeNotes });
+    const html = buildExportHTML({ rows: chartRows, entries, rangeLabel: label, includeNotes: exportIncludeNotes });
     const win = window.open("", "_blank");
     win.document.write(html);
     win.document.close();
   }
 
   if (page === "checkin") {
-    return <><style>{CSS}</style><CheckInPage date={date} setDate={handleCheckInDate} draft={draft} setDraft={setDraft} existingEntry={existingEntry} onSave={saveDraft} onCancel={() => setPage("home")} saveState={saveState} /></>;
+    return <><CheckInPage date={date} setDate={handleCheckInDate} draft={draft} setDraft={setDraft} existingEntry={existingEntry} onSave={saveDraft} onCancel={() => setPage("home")} saveState={saveState} /></>;
   }
 
-  const todayEntry = entries.find((entry) => entry.date === todayISO());
+  const todayEntry = entries.find((entry) => entry.date === currentToday);
 
   return (
     <main className="app-shell">
-      <style>{CSS}</style>
       <CrisisSupport />
 
       <header className="mobile-header">
@@ -650,13 +738,14 @@ export default function App() {
 
       {menuOpen && (
         <section className="menu-panel" aria-label="Menu">
+          <label className="menu-checkbox"><input type="checkbox" checked={exportIncludeNotes} onChange={(event) => setExportIncludeNotes(event.target.checked)} /> Include notes in export</label>
           <button type="button" onClick={() => { exportPdf(); setMenuOpen(false); }}><Download size={16} /> Export PDF</button>
-          <button type="button" onClick={() => { clearEntries(); setMenuOpen(false); }}><Trash2 size={16} /> Clear demo data</button>
+          <button type="button" onClick={() => { clearEntries(); setMenuOpen(false); }}><Trash2 size={16} /> Clear all local data</button>
           <p>Export is kept here because it matters, but it is not a daily action.</p>
         </section>
       )}
 
-      <MoodChart rows={chartRows} visible={visible} setVisible={setVisible} />
+      <MoodChart rows={chartRows} visible={visible} setVisible={setVisible} animateDayOne={shouldAnimateDayOne} />
       <RangeControls rangeMode={rangeMode} setRangeMode={setRangeMode} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} />
 
       <section className={todayEntry ? "checkin-cta completed" : "checkin-cta"}>
@@ -665,7 +754,7 @@ export default function App() {
           <h2>{todayEntry ? "You’ve already checked in today." : "Ready for today’s check-in?"}</h2>
           <p>{todayEntry ? "You can reopen today’s entry if you need to edit it." : "A few focused questions. One screen at a time."}</p>
         </div>
-        <Button onClick={() => { setDate(todayISO()); startCheckIn(); }} variant={todayEntry ? "secondary" : "primary"}>
+        <Button onClick={() => startCheckIn(currentToday)} variant={todayEntry ? "secondary" : "primary"}>
           <BarChart3 size={18} /> {todayEntry ? "Review today" : "Check in"}
         </Button>
       </section>
@@ -678,139 +767,3 @@ export default function App() {
     </main>
   );
 }
-
-const CSS = `
-:root{
-  --bg:#eef3ec;
-  --bg-deep:#dde8dc;
-  --surface:#fbfdf9;
-  --surface-soft:#f6faf4;
-  --text:#243028;
-  --muted:#5c6d62;
-  --primary:#5f7d68;
-  --primary-dark:#405a49;
-  --accent:#94a98c;
-  --accent-warm:#c07a4a;
-  --border:rgba(95,125,104,.24);
-  --shadow:0 18px 60px rgba(36,48,40,.10);
-  --radius:24px;
-}
-*{box-sizing:border-box}
-html{background:var(--bg);}
-body{margin:0;background:linear-gradient(180deg,var(--bg) 0%,#f8fbf6 100%);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-button,input,textarea{font:inherit}
-.app-shell{min-height:100vh;width:min(100%,760px);margin:0 auto;padding:clamp(14px,4vw,28px);padding-bottom:80px;}
-.mobile-header{position:relative;display:grid;grid-template-columns:44px 1fr 44px;align-items:start;gap:10px;margin:6px 0 16px;}
-.brand-lockup{grid-column:2;text-align:center;}
-.brand-lockup h1{font-size:clamp(38px,11vw,58px);line-height:.92;margin:4px 0 6px;letter-spacing:-.06em;color:var(--text);}
-.brand-lockup p{margin:0 auto;color:var(--muted);line-height:1.35;max-width:28rem;font-size:15px;}
-.eyebrow{text-transform:uppercase;letter-spacing:.22em;color:var(--primary-dark);font-size:11px;font-weight:850;margin:0 0 4px;}
-.menu-button{width:44px;height:44px;border:1px solid var(--border);background:rgba(251,253,249,.84);color:var(--text);border-radius:16px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);cursor:pointer;}
-.menu-panel{border:1px solid var(--border);background:rgba(251,253,249,.96);border-radius:22px;padding:12px;margin:0 0 14px;box-shadow:var(--shadow);display:grid;gap:8px;}
-.menu-panel button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:var(--surface-soft);color:var(--text);border-radius:16px;padding:13px 14px;font-weight:800;cursor:pointer;text-align:left;}
-.menu-panel p{margin:2px 4px 0;color:var(--muted);font-size:13px;line-height:1.35;}
-.card,.date-row{border:1px solid var(--border);background:rgba(251,253,249,.92);border-radius:var(--radius);padding:clamp(14px,4vw,22px);box-shadow:var(--shadow);color:var(--text);}
-.card h1,.card h2,.card h3{color:var(--text);}
-.card h1,.card h2{margin:0 0 8px;line-height:1.08;}
-.card p{color:var(--muted);line-height:1.5;margin:0 0 10px;}
-.button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:18px;padding:13px 18px;cursor:pointer;font-weight:850;transition:transform .08s ease,opacity .15s ease;min-height:46px;}
-.button:active{transform:scale(.97)}
-.button:disabled{opacity:.42;cursor:not-allowed}
-.button.primary{background:var(--primary);color:white;box-shadow:0 12px 30px rgba(95,125,104,.25)}
-.button.secondary{background:var(--surface-soft);color:var(--primary-dark);border:1px solid var(--border)}
-.chart-card{padding:14px;margin-bottom:14px;}
-.chart-header{text-align:left;padding:4px 4px 10px;}
-.chart-header h1{font-size:clamp(22px,7vw,32px);margin:2px 0 6px;}
-.big-chart-scroll{width:100%;overflow:visible;margin-top:6px;}
-.big-chart{width:100%;height:auto;display:block;border-radius:20px;max-height:52vh;}
-.chart-controls-label{font-size:11px;text-transform:uppercase;letter-spacing:.18em;font-weight:850;color:var(--primary-dark);margin:12px 2px 8px;}
-.legend-wrap,.range-buttons,.button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
-.legend,.range-chip{border:1px solid var(--border);background:var(--surface-soft);color:var(--text);border-radius:999px;padding:9px 11px;cursor:pointer;font-size:13px;font-weight:750;}
-.legend.on,.range-chip.active{background:var(--primary);color:white;border-color:var(--primary)}
-.legend span{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px;}
-.range-header{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-.range-header h2{font-size:20px;}
-.custom-range{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px;}
-.custom-range label,.date-row label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:13px;font-weight:750;}
-.custom-range input,.date-row input,textarea{background:white;color:var(--text);border:1px solid var(--border);border-radius:14px;padding:12px;min-height:44px;}
-textarea{width:100%;min-height:140px;resize:vertical;margin-top:14px;}
-.checkin-cta{position:sticky;bottom:12px;z-index:20;margin:16px 0;border:1px solid rgba(95,125,104,.34);background:linear-gradient(135deg,#fbfdf9,#e7f0e4);border-radius:28px;padding:16px;box-shadow:0 20px 70px rgba(36,48,40,.18);display:grid;gap:12px;text-align:left;}
-.checkin-cta h2{font-size:clamp(22px,6vw,30px);line-height:1.05;margin:0 0 4px;color:var(--text);}
-.checkin-cta p{color:var(--muted);margin:0;line-height:1.35;}
-.checkin-cta .button{width:100%;font-size:17px;}
-.checkin-cta.completed{position:relative;bottom:auto;opacity:.78;background:rgba(251,253,249,.82);box-shadow:var(--shadow);}
-.checkin-cta.completed h2{font-size:20px;}
-.lower-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px;}
-.frequency-box{margin-top:16px;}
-.frequency-box h3{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--primary-dark);margin:0 0 8px;}
-.freq-row{display:grid;grid-template-columns:84px 1fr 24px;align-items:center;gap:9px;margin:9px 0;color:var(--text);font-size:13px;}
-.freq-track{height:12px;background:rgba(95,125,104,.12);border-radius:999px;overflow:hidden;}
-.freq-bar{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:999px;}
-.muted{color:var(--muted)}
-.crisis-wrap{position:fixed;right:14px;bottom:14px;z-index:50;}
-.crisis-button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:rgba(251,253,249,.92);color:var(--primary-dark);border-radius:999px;padding:9px 12px;backdrop-filter:blur(10px);cursor:pointer;font-weight:750;box-shadow:var(--shadow);}
-.crisis-panel{width:min(300px,calc(100vw - 28px));margin-top:8px;padding:16px;border-radius:18px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);}
-.crisis-panel h3{margin:0 0 8px;color:var(--text);}
-.crisis-panel p{color:var(--muted);line-height:1.4;}
-.safety-footer{margin:34px 0 8px;padding:20px 4px;border-top:1px solid var(--border);color:var(--muted);}
-.safety-footer div{display:flex;align-items:center;gap:8px;}
-.safety-footer h2{margin:0;color:var(--text);font-size:20px;}
-.safety-footer p{line-height:1.5;}
-.checkin-shell{width:min(100%,760px);padding-bottom:120px;}
-.checkin-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px;}
-.back-link{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;color:var(--primary-dark);cursor:pointer;font-weight:850;min-height:44px;padding:0;}
-.progress-pill{border:1px solid var(--border);background:rgba(251,253,249,.82);border-radius:999px;padding:8px 12px;font-weight:850;color:var(--primary-dark);white-space:nowrap;}
-.checkin-date{margin:14px 0;}
-.step-card{min-height:min(560px,calc(100svh - 230px));display:flex;flex-direction:column;justify-content:center;text-align:center;}
-.wide-step{text-align:left;justify-content:flex-start;min-height:auto;}
-.step-icon{width:64px;height:64px;margin:0 auto 14px;border-radius:22px;background:var(--surface-soft);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--primary-dark);}
-.step-card h1{font-size:clamp(28px,8vw,40px);line-height:1.08;max-width:720px;margin:0 auto 14px;}
-.step-value{font-size:22px;font-weight:900;margin:8px 0 18px;color:var(--primary-dark);}
-.range{width:100%;height:38px;margin-top:14px;appearance:none;background:transparent;}
-.range.jumbo{max-width:720px;margin-left:auto;margin-right:auto;}
-.range::-webkit-slider-runnable-track{height:18px;border-radius:999px;background:linear-gradient(90deg,#d9e2d7,#eef3ec,#5f7d68);border:1px solid var(--border);box-shadow:inset 0 1px 4px rgba(36,48,40,.18)}
-.range::-webkit-slider-thumb{appearance:none;width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffffff,#dfe8dc 54%,#5f7d68);border:3px solid white;margin-top:-11px;box-shadow:0 0 0 5px rgba(95,125,104,.12),0 10px 24px rgba(36,48,40,.18);cursor:pointer;}
-.range:disabled{opacity:.35;}
-.range:active::-webkit-slider-thumb{transform:scale(1.06)}
-.range::-moz-range-track{height:18px;border-radius:999px;background:linear-gradient(90deg,#d9e2d7,#eef3ec,#5f7d68);border:1px solid var(--border)}
-.range::-moz-range-thumb{width:38px;height:38px;border-radius:50%;background:#dfe8dc;border:3px solid white;box-shadow:0 10px 24px rgba(36,48,40,.18);cursor:pointer;}
-.range-labels{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;text-align:center;font-size:11px;color:var(--muted);margin:8px auto 0;max-width:760px;}
-.step-actions-inline{margin-top:24px;}
-.step-nav{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);width:min(760px,calc(100vw - 28px));display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(251,253,249,.86);border:1px solid var(--border);border-radius:24px;padding:10px;box-shadow:0 18px 60px rgba(36,48,40,.18);backdrop-filter:blur(12px);z-index:30;}
-.step-nav .button{flex:1;}
-.tag-group{margin-top:16px;}
-.tag-group h3{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--primary-dark);margin:0 0 8px;}
-.tag-wrap{display:flex;flex-wrap:wrap;gap:8px;}
-.tag{border:1px solid var(--border);color:var(--text);border-radius:999px;padding:9px 12px;cursor:pointer;background:var(--surface-soft);}
-.tag-low{background:rgba(100,116,139,.10)}.tag-active{background:rgba(192,122,74,.12)}.tag-warm{background:rgba(148,169,140,.18)}.tag-care{background:rgba(95,125,104,.14)}.tag-body{background:rgba(127,166,111,.14)}.tag-people{background:rgba(148,169,140,.16)}.tag-work{background:rgba(192,122,74,.12)}
-.tag.selected{box-shadow:inset 0 0 0 2px var(--primary);filter:brightness(1.03)}
-.checkbox-line{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted)}
-.day-one-ring{transform-origin:center;animation:stampRing .62s ease-out both;}
-.day-one-compass{transform-origin:center;animation:stampCompass .62s ease-out both;}
-.day-one-needle{transform-origin:center;animation:needleSpin 1.05s cubic-bezier(.2,.8,.2,1) .25s both;}
-.day-one-label{font-size:18px;font-weight:800;fill:var(--primary-dark);opacity:0;animation:writeIn .8s ease-out .62s forwards;}
-@keyframes stampRing{0%{transform:scale(.2);opacity:0}65%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}
-@keyframes stampCompass{0%{transform:scale(.5);opacity:0}100%{transform:scale(1);opacity:1}}
-@keyframes needleSpin{0%{transform:rotate(-140deg);opacity:.2}70%{transform:rotate(390deg);opacity:1}100%{transform:rotate(360deg);opacity:1}}
-@keyframes writeIn{0%{opacity:0;letter-spacing:.18em}100%{opacity:1;letter-spacing:0}}
-@media (min-width:760px){
-  .app-shell{width:min(100%,980px)}
-  .mobile-header{grid-template-columns:52px 1fr 52px;margin-top:12px;}
-  .menu-button{width:48px;height:48px;}
-  .checkin-cta{grid-template-columns:1fr auto;align-items:center;position:relative;bottom:auto;}
-  .checkin-cta .button{width:auto;min-width:180px;}
-  .lower-grid{grid-template-columns:1fr;}
-  .custom-range{grid-template-columns:1fr 1fr;}
-}
-@media (max-width:430px){
-  .app-shell{padding-inline:12px;}
-  .card,.date-row{border-radius:20px;padding:13px;}
-  .big-chart{max-height:48vh;}
-  .legend,.range-chip{font-size:12px;padding:8px 10px;}
-  .freq-row{grid-template-columns:76px 1fr 22px;font-size:12px;}
-  .range-labels{font-size:10px;}
-}
-@media (prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}
-}
-`;
