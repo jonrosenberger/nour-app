@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
   CalendarDays,
+  Compass,
   Check,
   Download,
   FileText,
@@ -52,7 +53,6 @@ const APP_CONFIG = {
 const FEATURE_FLAGS = {
   enforceBackdatingLimit: false,
   maxBackdateDays: 3,
-  tagsInCheckin: false, // V2+: feelings/events tag steps. Set true to re-enable in check-in flow.
 };
 
 const TRACKERS = [
@@ -369,11 +369,10 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
           <rect x={pad.left} y={pad.top} width={innerW} height={innerH} fill="url(#bigGrid)" stroke="#45738d" strokeWidth="3" />
 
           {[0, 25, 50, 75, 100].map((value) => (
-            <g key={value}>
-              <line x1={pad.left} x2={pad.left + innerW} y1={yFor(value)} y2={yFor(value)} stroke={value === 50 ? "#111827" : "rgba(17,24,39,.45)"} strokeDasharray={value === 50 ? "8 8" : ""} strokeWidth={value === 50 ? 2.5 : 1.4} />
-              <text x={pad.left - 12} y={yFor(value) + 4} textAnchor="end" fontSize="13" fill="#111827" fontWeight="700">{value}</text>
-            </g>
+            <line key={value} x1={pad.left} x2={pad.left + innerW} y1={yFor(value)} y2={yFor(value)} stroke={value === 50 ? "#111827" : "rgba(17,24,39,.45)"} strokeDasharray={value === 50 ? "8 8" : ""} strokeWidth={value === 50 ? 2.5 : 1.4} />
           ))}
+          <text x={pad.left - 12} y={yFor(100) + 4} textAnchor="end" fontSize="14" fill="#111827" fontWeight="800">Feeling better</text>
+          <text x={pad.left - 12} y={yFor(0) + 4} textAnchor="end" fontSize="14" fill="#111827" fontWeight="800">Feeling worse</text>
           <text x={pad.left + 8} y={yFor(50) - 8} fontSize="14" fill="#111827" fontWeight="800">personal neutral line</text>
 
           {activeSeries.map((item) => {
@@ -391,11 +390,7 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
             <g className={animateDayOne ? "day-one-marker animate" : "day-one-marker"} transform={`translate(${dayOneX} ${dayOneY})`}>
               <circle className="day-one-ring" r="26" fill="none" stroke="#5f7d68" strokeWidth="3" />
               <circle r="14" fill="#eef3ec" stroke="#243028" strokeWidth="3" />
-              <g className="day-one-compass">
-                <circle r="9" fill="none" stroke="#243028" strokeWidth="2" />
-                <polygon points="0,-6 2,-1 -2,-1" fill="#c07a4a" />
-                <polygon points="0,6 2,1 -2,1" fill="#243028" />
-              </g>
+              <Compass className="day-one-compass" x="-10" y="-10" width="20" height="20" color="#243028" strokeWidth="2.4" />
               <line className="day-one-needle" x1="0" y1="0" x2="0" y2="-11" stroke="#c07a4a" strokeWidth="3" strokeLinecap="round" />
               <text className="day-one-label" x="0" y="48" textAnchor="middle">Day 1. Start of my journey.</text>
             </g>
@@ -478,15 +473,9 @@ function SliderStep({ field, value, skipped, onValue, onSkip, onUnskip }) {
       <div className="step-icon"><Icon size={30} /></div>
       <p className="eyebrow">{field.label}</p>
       <h1>{field.prompt}</h1>
-      <div className="step-value">{skipped ? "Skipped" : fieldLabel(value, field)}</div>
-      <div className="slider-track-wrap">
-        <input className="range jumbo" type="range" min="0" max="100" value={value} disabled={skipped} onChange={(e) => onValue(field.key, Number(e.target.value))} aria-label={field.prompt} />
-        <div className="range-labels">
-          {[field.left, field.midLeft, field.center, field.midRight, field.right].map((label, i) => (
-            <span key={i} style={{ left: `${i * 25}%` }}>{label}</span>
-          ))}
-        </div>
-      </div>
+      {skipped && <div className="step-value">Skipped</div>}
+      <input className="range jumbo" type="range" min="0" max="100" value={value} disabled={skipped} onChange={(e) => onValue(field.key, Number(e.target.value))} aria-label={field.prompt} />
+      <div className="range-labels"><span>{field.left}</span><span>{field.midLeft}</span><span>{field.center}</span><span>{field.midRight}</span><span>{field.right}</span></div>
       <div className="step-actions-inline">
         {skipped ? <Button variant="secondary" onClick={() => onUnskip(field.key)}>Answer this field</Button> : <Button variant="secondary" onClick={() => onSkip(field.key)}><SkipForward size={16} /> Skip this field</Button>}
       </div>
@@ -524,8 +513,7 @@ function NotesStep({ note, setNote, includeNotesInExport, setIncludeNotesInExpor
 
 function CheckInPage({ date, setDate, draft, setDraft, existingEntry, onSave, onCancel, saveState }) {
   const [step, setStep] = useState(0);
-  const tagStepCount = FEATURE_FLAGS.tagsInCheckin ? 2 : 0;
-  const totalSteps = FIELDS.length + tagStepCount + 1;
+  const totalSteps = FIELDS.length + 3;
   const currentField = FIELDS[step];
 
   function updateValue(key, value) {
@@ -547,9 +535,9 @@ function CheckInPage({ date, setDate, draft, setDraft, existingEntry, onSave, on
       <div className="date-row checkin-date"><label>Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label></div>
 
       {currentField && <SliderStep field={currentField} value={draft.fields[currentField.key] ?? 50} skipped={draft.skippedFields[currentField.key]} onValue={updateValue} onSkip={skipField} onUnskip={unskipField} />}
-      {FEATURE_FLAGS.tagsInCheckin && step === FIELDS.length && <TagGroupPicker title="Feelings" subtitle="Click any that fit. These labels do not affect the chart score." groups={FEELING_GROUPS} selected={draft.feelings} setSelected={(fn) => setDraft((prev) => ({ ...prev, feelings: typeof fn === "function" ? fn(prev.feelings) : fn }))} />}
-      {FEATURE_FLAGS.tagsInCheckin && step === FIELDS.length + 1 && <TagGroupPicker title="Events" subtitle="Optional context for memory or export. These do not affect the chart score." groups={EVENT_GROUPS} selected={draft.events} setSelected={(fn) => setDraft((prev) => ({ ...prev, events: typeof fn === "function" ? fn(prev.events) : fn }))} />}
-      {step === FIELDS.length + tagStepCount && <NotesStep note={draft.note} setNote={(note) => setDraft((prev) => ({ ...prev, note }))} includeNotesInExport={draft.includeNotesInExport} setIncludeNotesInExport={(includeNotesInExport) => setDraft((prev) => ({ ...prev, includeNotesInExport }))} />}
+      {step === FIELDS.length && <TagGroupPicker title="Feelings" subtitle="Click any that fit. These labels do not affect the chart score." groups={FEELING_GROUPS} selected={draft.feelings} setSelected={(fn) => setDraft((prev) => ({ ...prev, feelings: typeof fn === "function" ? fn(prev.feelings) : fn }))} />}
+      {step === FIELDS.length + 1 && <TagGroupPicker title="Events" subtitle="Optional context for memory or export. These do not affect the chart score." groups={EVENT_GROUPS} selected={draft.events} setSelected={(fn) => setDraft((prev) => ({ ...prev, events: typeof fn === "function" ? fn(prev.events) : fn }))} />}
+      {step === FIELDS.length + 2 && <NotesStep note={draft.note} setNote={(note) => setDraft((prev) => ({ ...prev, note }))} includeNotesInExport={draft.includeNotesInExport} setIncludeNotesInExport={(includeNotesInExport) => setDraft((prev) => ({ ...prev, includeNotesInExport }))} />}
 
       {saveState === "error" && <p className="save-error">Nour could not save this entry. Your browser storage may be full or unavailable.</p>}
       <div className="step-nav">
@@ -615,7 +603,9 @@ function buildExportHTML({ rows, entries, rangeLabel, includeNotes }) {
       <div class="card"><svg viewBox="0 0 ${width} ${height}">
         <rect x="0" y="0" width="${width}" height="${height}" rx="24" fill="#f8f1df"/>
         <rect x="${pad.left}" y="${pad.top}" width="${innerW}" height="${innerH}" fill="#eef6f6" stroke="#45738d" stroke-width="3"/>
-        ${[0,25,50,75,100].map(v => `<line x1="${pad.left}" x2="${pad.left+innerW}" y1="${yFor(v)}" y2="${yFor(v)}" stroke="#111827" stroke-opacity="${v===50 ? .8 : .25}" stroke-width="${v===50 ? 2.4 : 1.2}" stroke-dasharray="${v===50 ? '8 8' : ''}"/><text x="${pad.left-12}" y="${yFor(v)+4}" text-anchor="end" font-size="12" font-weight="700">${v}</text>`).join('')}
+        ${[0,25,50,75,100].map(v => `<line x1="${pad.left}" x2="${pad.left+innerW}" y1="${yFor(v)}" y2="${yFor(v)}" stroke="#111827" stroke-opacity="${v===50 ? .8 : .25}" stroke-width="${v===50 ? 2.4 : 1.2}" stroke-dasharray="${v===50 ? '8 8' : ''}"/>`).join('')}
+        <text x="${pad.left-12}" y="${yFor(100)+4}" text-anchor="end" font-size="12" font-weight="700">Feeling better</text>
+        <text x="${pad.left-12}" y="${yFor(0)+4}" text-anchor="end" font-size="12" font-weight="700">Feeling worse</text>
         <path d="${compositePath}" fill="none" stroke="#111827" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".82"/>
         <path d="${trendPath}" fill="none" stroke="#b45309" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".92"/>
         ${rows.map((row,i)=> typeof row.composite === 'number' ? `<circle cx="${xFor(i)}" cy="${yFor(row.composite)}" r="4" fill="#111827"/>` : '').join('')}
@@ -625,6 +615,44 @@ function buildExportHTML({ rows, entries, rangeLabel, includeNotes }) {
       <div class="footer">Generated locally by the user. Data stays on the device unless exported. User-entered record only; not a diagnosis, treatment plan, clinical assessment, or emergency service.</div>
       <script>window.print()</script>
     </body></html>`;
+}
+
+function parseImportedEntries(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+    const parsed = JSON.parse(trimmed);
+    return migrateEntries(Array.isArray(parsed) ? parsed : parsed.entries);
+  }
+
+  const lines = trimmed.split(/\r?\n/).filter(Boolean);
+  const headers = lines.shift().split(",").map((header) => header.trim());
+
+  return migrateEntries(lines.map((line) => {
+    const values = line.split(",").map((value) => value.trim());
+    const row = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+    const fields = {};
+    FIELDS.forEach((field) => {
+      const raw = row[field.key] ?? row[field.label] ?? row[field.label.toLowerCase()];
+      const value = Number(raw);
+      fields[field.key] = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null;
+    });
+    return {
+      id: row.id || uid(),
+      schemaVersion: APP_CONFIG.schemaVersion,
+      date: row.date,
+      fields,
+      skippedFields: FIELDS.reduce((acc, field) => ({ ...acc, [field.key]: fields[field.key] === null }), {}),
+      skippedDay: FIELDS.every((field) => fields[field.key] === null),
+      feelings: row.feelings ? row.feelings.split(";").map((item) => item.trim()).filter(Boolean) : [],
+      events: row.events ? row.events.split(";").map((item) => item.trim()).filter(Boolean) : [],
+      note: row.note || "",
+      includeNotesInExport: true,
+      createdAt: row.createdAt || new Date().toISOString(),
+      updatedAt: row.updatedAt || new Date().toISOString(),
+    };
+  })).filter((entry) => entry.date);
 }
 
 export default function App() {
@@ -640,6 +668,7 @@ export default function App() {
   const [exportIncludeNotes, setExportIncludeNotes] = useState(true);
   const [currentToday, setCurrentToday] = useState(todayISO());
   const [dayOneAnimationSeen, setDayOneAnimationSeen] = useState(() => localStorage.getItem(APP_CONFIG.dayOneAnimationSeenKey) === "true");
+  const importInputRef = useRef(null);
 
   const existingEntry = entries.find((entry) => entry.date === date);
   const [draft, setDraft] = useState(() => buildDraftFromEntry(existingEntry));
@@ -715,6 +744,36 @@ export default function App() {
     win.document.close();
   }
 
+  function importEntriesFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const imported = parseImportedEntries(String(reader.result || ""));
+        if (!imported.length) {
+          window.alert("No valid entries found in that import file.");
+          return;
+        }
+        const merged = [...entries.filter((entry) => !imported.some((item) => item.date === entry.date)), ...imported].sort((a, b) => a.date.localeCompare(b.date));
+        const result = saveEntries(merged);
+        if (!result.ok) {
+          window.alert("Nour could not import this file. Please try again.");
+          return;
+        }
+        setEntries(merged);
+        setMenuOpen(false);
+      } catch (error) {
+        console.error("Unable to import Nour entries", error);
+        window.alert("Nour could not read that import file.");
+      } finally {
+        event.target.value = "";
+      }
+    };
+    reader.readAsText(file);
+  }
+
   if (page === "checkin") {
     return <><CheckInPage date={date} setDate={handleCheckInDate} draft={draft} setDraft={setDraft} existingEntry={existingEntry} onSave={saveDraft} onCancel={() => setPage("home")} saveState={saveState} /></>;
   }
@@ -740,6 +799,8 @@ export default function App() {
         <section className="menu-panel" aria-label="Menu">
           <label className="menu-checkbox"><input type="checkbox" checked={exportIncludeNotes} onChange={(event) => setExportIncludeNotes(event.target.checked)} /> Include notes in export</label>
           <button type="button" onClick={() => { exportPdf(); setMenuOpen(false); }}><Download size={16} /> Export PDF</button>
+          <button type="button" onClick={() => importInputRef.current?.click()}><FileText size={16} /> Import QA data</button>
+          <input ref={importInputRef} className="hidden-file-input" type="file" accept=".csv,.json,application/json,text/csv" onChange={importEntriesFile} />
           <button type="button" onClick={() => { clearEntries(); setMenuOpen(false); }}><Trash2 size={16} /> Clear all local data</button>
           <p>Export is kept here because it matters, but it is not a daily action.</p>
         </section>
@@ -759,9 +820,6 @@ export default function App() {
         </Button>
       </section>
 
-      <section className="lower-grid">
-        <Card><h2>Context in this range</h2><p>Tags are context only. They do not affect the chart.</p><TagFrequency title="Feelings" counts={feelingCounts} /><TagFrequency title="Events" counts={eventCounts} /></Card>
-      </section>
 
       <SafetyFooter />
     </main>

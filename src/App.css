@@ -93,20 +93,7 @@ textarea{width:100%;min-height:140px;resize:vertical;margin-top:14px;}
 .range:active::-webkit-slider-thumb{transform:scale(1.06)}
 .range::-moz-range-track{height:18px;border-radius:999px;background:linear-gradient(90deg,#d9e2d7,#eef3ec,#5f7d68);border:1px solid var(--border)}
 .range::-moz-range-thumb{width:38px;height:38px;border-radius:50%;background:#dfe8dc;border:3px solid white;box-shadow:0 10px 24px rgba(36,48,40,.18);cursor:pointer;}
-/* ============================================================
-   SLIDER LABEL POSITIONING — DO NOT ALTER THIS BLOCK
-   Labels are absolutely positioned at 0/25/50/75/100% of the
-   slider track width. The first/last overrides prevent clipping
-   at the edges. Replacing this with grid or flexbox will break
-   label alignment across all slider steps. See v0.3.1 for history.
-   ============================================================ */
-.range-labels{position:relative;display:block;width:100%;height:22px;font-size:11px;color:var(--muted);margin:10px auto 0;}
-.range-labels span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;}
-.range-labels span:first-child{transform:translateX(0);}
-.range-labels span:last-child{transform:translateX(-100%);}
-.slider-track-wrap{width:100%;max-width:720px;margin:0 auto;}
-.slider-track-wrap .range.jumbo{display:block;width:100%;max-width:none;margin-left:0;margin-right:0;}
-/* ============================================================ */
+.range-labels{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;text-align:center;font-size:11px;color:var(--muted);margin:8px auto 0;max-width:760px;}
 .step-actions-inline{margin-top:24px;}
 .step-nav{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);width:min(760px,calc(100vw - 28px));display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(251,253,249,.86);border:1px solid var(--border);border-radius:24px;padding:10px;box-shadow:0 18px 60px rgba(36,48,40,.18);backdrop-filter:blur(12px);z-index:30;}
 .step-nav .button{flex:1;}
@@ -155,3 +142,6 @@ textarea{width:100%;min-height:140px;resize:vertical;margin-top:14px;}
 .day-one-marker.animate .day-one-compass{animation:stampCompass .62s ease-out both;}
 .day-one-marker.animate .day-one-needle{animation:needleSpin 1.05s cubic-bezier(.2,.8,.2,1) .25s both;}
 .day-one-marker.animate .day-one-label{opacity:0;animation:writeIn .8s ease-out .62s forwards;}
+
+.hidden-file-input{display:none;}
+.checkin-shell .crisis-wrap{bottom:92px;}
