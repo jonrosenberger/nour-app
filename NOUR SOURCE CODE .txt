@@ -4,15 +4,12 @@ import {
   ArrowRight,
   BarChart3,
   CalendarDays,
-  Compass,
   Check,
   Download,
   FileText,
   Heart,
   HelpCircle,
   Home,
-  Menu,
-  X,
   LifeBuoy,
   Moon,
   RotateCcw,
@@ -291,9 +288,6 @@ function MoodChart({ rows, visible, setVisible }) {
   ];
 
   const activeSeries = series.filter((item) => (item.key === "compositeTrend" ? visible.trend : visible[item.key]));
-  const dayOneRow = rows.length === 1 && typeof rows[0]?.composite === "number" ? rows[0] : null;
-  const dayOneX = dayOneRow ? xFor(0) : null;
-  const dayOneY = dayOneRow ? yFor(dayOneRow.composite) : null;
 
   return (
     <Card className="chart-card">
@@ -303,6 +297,20 @@ function MoodChart({ rows, visible, setVisible }) {
           <h1>{APP_CONFIG.appName}</h1>
           <p>Daily composite plus a smoothed overall path. No interpretation; just your recorded data.</p>
         </div>
+      </div>
+
+      <div className="legend-wrap">
+        <button className={visible.composite ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, composite: !v.composite }))}>
+          <span style={{ background: "#111827" }} /> Composite
+        </button>
+        <button className={visible.trend ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, trend: !v.trend }))}>
+          <span style={{ background: "#b45309" }} /> Overall path
+        </button>
+        {FIELDS.map((field) => (
+          <button key={field.key} className={visible[field.key] ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, [field.key]: !v[field.key] }))}>
+            <span style={{ background: field.color }} /> {field.label}
+          </button>
+        ))}
       </div>
 
       <div className="big-chart-scroll">
@@ -342,36 +350,14 @@ function MoodChart({ rows, visible, setVisible }) {
             );
           })}
 
-          {dayOneRow ? (
-            <g className="day-one-marker" transform={`translate(${dayOneX} ${dayOneY})`}>
-              <circle className="day-one-ring" r="26" fill="none" stroke="#5f7d68" strokeWidth="3" />
-              <circle r="14" fill="#eef3ec" stroke="#243028" strokeWidth="3" />
-              <Compass className="day-one-compass" x="-10" y="-10" width="20" height="20" color="#243028" strokeWidth="2.4" />
-              <line className="day-one-needle" x1="0" y1="0" x2="0" y2="-11" stroke="#c07a4a" strokeWidth="3" strokeLinecap="round" />
-              <text className="day-one-label" x="0" y="48" textAnchor="middle">Day 1. Start of my journey.</text>
-            </g>
-          ) : rows.map((row, index) => typeof row.composite === "number" ? <circle key={row.date} cx={xFor(index)} cy={yFor(row.composite)} r="4" fill="#243028" opacity=".85" /> : null)}
+          {rows.map((row, index) => typeof row.composite === "number" ? <circle key={row.date} cx={xFor(index)} cy={yFor(row.composite)} r="4" fill="#111827" opacity=".85" /> : null)}
           {rows.map((row, index) => {
             const showLabel = rows.length <= 12 || index === 0 || index === rows.length - 1 || index % Math.ceil(rows.length / 8) === 0;
             return showLabel ? <text key={`label-${row.date}`} x={xFor(index)} y={height - 26} textAnchor="middle" fontSize="12" fill="#111827" fontWeight="700">{row.date.slice(5)}</text> : null;
           })}
         </svg>
       </div>
-
-        <div className="chart-controls-label">Chart options</div>
-      <div className="legend-wrap">
-        <button className={visible.composite ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, composite: !v.composite }))}>
-          <span style={{ background: "#111827" }} /> Composite
-        </button>
-        <button className={visible.trend ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, trend: !v.trend }))}>
-          <span style={{ background: "#b45309" }} /> Overall path
-        </button>
-        {FIELDS.map((field) => (
-          <button key={field.key} className={visible[field.key] ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, [field.key]: !v[field.key] }))}>
-            <span style={{ background: field.color }} /> {field.label}
-          </button>
-        ))}
-      </div>    </Card>
+    </Card>
   );
 }
 
@@ -579,7 +565,6 @@ export default function App() {
   const [customEnd, setCustomEnd] = useState(todayISO());
   const [visible, setVisible] = useState(DEFAULT_VISIBLE);
   const [saveState, setSaveState] = useState("idle");
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const existingEntry = entries.find((entry) => entry.date === date);
   const [draft, setDraft] = useState(() => buildDraftFromEntry(existingEntry));
@@ -630,48 +615,21 @@ export default function App() {
     return <><style>{CSS}</style><CheckInPage date={date} setDate={handleCheckInDate} draft={draft} setDraft={setDraft} existingEntry={existingEntry} onSave={saveDraft} onCancel={() => setPage("home")} saveState={saveState} /></>;
   }
 
-  const todayEntry = entries.find((entry) => entry.date === todayISO());
-
   return (
     <main className="app-shell">
       <style>{CSS}</style>
       <CrisisSupport />
-
-      <header className="mobile-header">
-        <button className="menu-button" type="button" onClick={() => setMenuOpen((open) => !open)} aria-label="Open menu">
-          {menuOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
-        <div className="brand-lockup">
-          <p className="eyebrow">Working prototype</p>
-          <h1>{APP_CONFIG.appName}</h1>
-          <p>Healing has curves. Follow trends, not moments.</p>
-        </div>
-      </header>
-
-      {menuOpen && (
-        <section className="menu-panel" aria-label="Menu">
-          <button type="button" onClick={() => { exportPdf(); setMenuOpen(false); }}><Download size={16} /> Export PDF</button>
-          <button type="button" onClick={() => { clearEntries(); setMenuOpen(false); }}><Trash2 size={16} /> Clear demo data</button>
-          <p>Export is kept here because it matters, but it is not a daily action.</p>
-        </section>
-      )}
-
-      <MoodChart rows={chartRows} visible={visible} setVisible={setVisible} />
-      <RangeControls rangeMode={rangeMode} setRangeMode={setRangeMode} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} />
-
-      <section className={todayEntry ? "checkin-cta completed" : "checkin-cta"}>
-        <div>
-          <p className="eyebrow">Today</p>
-          <h2>{todayEntry ? "You’ve already checked in today." : "Ready for today’s check-in?"}</h2>
-          <p>{todayEntry ? "You can reopen today’s entry if you need to edit it." : "A few focused questions. One screen at a time."}</p>
-        </div>
-        <Button onClick={() => { setDate(todayISO()); startCheckIn(); }} variant={todayEntry ? "secondary" : "primary"}>
-          <BarChart3 size={18} /> {todayEntry ? "Review today" : "Check in"}
-        </Button>
+      <section className="home-hero">
+        <div><p className="eyebrow">Working prototype</p><h1>{APP_CONFIG.appName}</h1><p>A private emotional cartography tool. Chart first. Check-in separate. No diagnosis, no interpretation.</p></div>
+        <Button onClick={startCheckIn}><BarChart3 size={18} /> Check in</Button>
       </section>
 
+      <RangeControls rangeMode={rangeMode} setRangeMode={setRangeMode} customStart={customStart} setCustomStart={setCustomStart} customEnd={customEnd} setCustomEnd={setCustomEnd} />
+      <MoodChart rows={chartRows} visible={visible} setVisible={setVisible} />
+
       <section className="lower-grid">
-        <Card><h2>Context in this range</h2><p>Tags are context only. They do not affect the chart.</p><TagFrequency title="Feelings" counts={feelingCounts} /><TagFrequency title="Events" counts={eventCounts} /></Card>
+        <Card><h2>Most selected in this range</h2><p>Tags are context only. They do not affect the chart.</p><TagFrequency title="Feelings" counts={feelingCounts} /><TagFrequency title="Events" counts={eventCounts} /></Card>
+        <Card><h2>Export / demo controls</h2><p>PDF uses the selected range. Notes are included unless an entry was saved with notes excluded.</p><div className="button-row"><Button variant="secondary" onClick={exportPdf}><Download size={16} /> Export PDF</Button><Button variant="secondary" onClick={clearEntries}><Trash2 size={16} /> Clear demo data</Button></div></Card>
       </section>
 
       <SafetyFooter />
@@ -680,137 +638,5 @@ export default function App() {
 }
 
 const CSS = `
-:root{
-  --bg:#eef3ec;
-  --bg-deep:#dde8dc;
-  --surface:#fbfdf9;
-  --surface-soft:#f6faf4;
-  --text:#243028;
-  --muted:#5c6d62;
-  --primary:#5f7d68;
-  --primary-dark:#405a49;
-  --accent:#94a98c;
-  --accent-warm:#c07a4a;
-  --border:rgba(95,125,104,.24);
-  --shadow:0 18px 60px rgba(36,48,40,.10);
-  --radius:24px;
-}
-*{box-sizing:border-box}
-html{background:var(--bg);}
-body{margin:0;background:linear-gradient(180deg,var(--bg) 0%,#f8fbf6 100%);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-button,input,textarea{font:inherit}
-.app-shell{min-height:100vh;width:min(100%,760px);margin:0 auto;padding:clamp(14px,4vw,28px);padding-bottom:80px;}
-.mobile-header{position:relative;display:grid;grid-template-columns:44px 1fr 44px;align-items:start;gap:10px;margin:6px 0 16px;}
-.brand-lockup{grid-column:2;text-align:center;}
-.brand-lockup h1{font-size:clamp(38px,11vw,58px);line-height:.92;margin:4px 0 6px;letter-spacing:-.06em;color:var(--text);}
-.brand-lockup p{margin:0 auto;color:var(--muted);line-height:1.35;max-width:28rem;font-size:15px;}
-.eyebrow{text-transform:uppercase;letter-spacing:.22em;color:var(--primary-dark);font-size:11px;font-weight:850;margin:0 0 4px;}
-.menu-button{width:44px;height:44px;border:1px solid var(--border);background:rgba(251,253,249,.84);color:var(--text);border-radius:16px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);cursor:pointer;}
-.menu-panel{border:1px solid var(--border);background:rgba(251,253,249,.96);border-radius:22px;padding:12px;margin:0 0 14px;box-shadow:var(--shadow);display:grid;gap:8px;}
-.menu-panel button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:var(--surface-soft);color:var(--text);border-radius:16px;padding:13px 14px;font-weight:800;cursor:pointer;text-align:left;}
-.menu-panel p{margin:2px 4px 0;color:var(--muted);font-size:13px;line-height:1.35;}
-.card,.date-row{border:1px solid var(--border);background:rgba(251,253,249,.92);border-radius:var(--radius);padding:clamp(14px,4vw,22px);box-shadow:var(--shadow);color:var(--text);}
-.card h1,.card h2,.card h3{color:var(--text);}
-.card h1,.card h2{margin:0 0 8px;line-height:1.08;}
-.card p{color:var(--muted);line-height:1.5;margin:0 0 10px;}
-.button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:18px;padding:13px 18px;cursor:pointer;font-weight:850;transition:transform .08s ease,opacity .15s ease;min-height:46px;}
-.button:active{transform:scale(.97)}
-.button:disabled{opacity:.42;cursor:not-allowed}
-.button.primary{background:var(--primary);color:white;box-shadow:0 12px 30px rgba(95,125,104,.25)}
-.button.secondary{background:var(--surface-soft);color:var(--primary-dark);border:1px solid var(--border)}
-.chart-card{padding:14px;margin-bottom:14px;}
-.chart-header{text-align:left;padding:4px 4px 10px;}
-.chart-header h1{font-size:clamp(22px,7vw,32px);margin:2px 0 6px;}
-.big-chart-scroll{width:100%;overflow:visible;margin-top:6px;}
-.big-chart{width:100%;height:auto;display:block;border-radius:20px;max-height:52vh;}
-.chart-controls-label{font-size:11px;text-transform:uppercase;letter-spacing:.18em;font-weight:850;color:var(--primary-dark);margin:12px 2px 8px;}
-.legend-wrap,.range-buttons,.button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
-.legend,.range-chip{border:1px solid var(--border);background:var(--surface-soft);color:var(--text);border-radius:999px;padding:9px 11px;cursor:pointer;font-size:13px;font-weight:750;}
-.legend.on,.range-chip.active{background:var(--primary);color:white;border-color:var(--primary)}
-.legend span{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px;}
-.range-header{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-.range-header h2{font-size:20px;}
-.custom-range{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px;}
-.custom-range label,.date-row label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:13px;font-weight:750;}
-.custom-range input,.date-row input,textarea{background:white;color:var(--text);border:1px solid var(--border);border-radius:14px;padding:12px;min-height:44px;}
-textarea{width:100%;min-height:140px;resize:vertical;margin-top:14px;}
-.checkin-cta{position:sticky;bottom:12px;z-index:20;margin:16px 0;border:1px solid rgba(95,125,104,.34);background:linear-gradient(135deg,#fbfdf9,#e7f0e4);border-radius:28px;padding:16px;box-shadow:0 20px 70px rgba(36,48,40,.18);display:grid;gap:12px;text-align:left;}
-.checkin-cta h2{font-size:clamp(22px,6vw,30px);line-height:1.05;margin:0 0 4px;color:var(--text);}
-.checkin-cta p{color:var(--muted);margin:0;line-height:1.35;}
-.checkin-cta .button{width:100%;font-size:17px;}
-.checkin-cta.completed{position:relative;bottom:auto;opacity:.78;background:rgba(251,253,249,.82);box-shadow:var(--shadow);}
-.checkin-cta.completed h2{font-size:20px;}
-.lower-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px;}
-.frequency-box{margin-top:16px;}
-.frequency-box h3{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--primary-dark);margin:0 0 8px;}
-.freq-row{display:grid;grid-template-columns:84px 1fr 24px;align-items:center;gap:9px;margin:9px 0;color:var(--text);font-size:13px;}
-.freq-track{height:12px;background:rgba(95,125,104,.12);border-radius:999px;overflow:hidden;}
-.freq-bar{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:999px;}
-.muted{color:var(--muted)}
-.crisis-wrap{position:fixed;right:14px;bottom:14px;z-index:50;}
-.crisis-button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:rgba(251,253,249,.92);color:var(--primary-dark);border-radius:999px;padding:9px 12px;backdrop-filter:blur(10px);cursor:pointer;font-weight:750;box-shadow:var(--shadow);}
-.crisis-panel{width:min(300px,calc(100vw - 28px));margin-top:8px;padding:16px;border-radius:18px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);}
-.crisis-panel h3{margin:0 0 8px;color:var(--text);}
-.crisis-panel p{color:var(--muted);line-height:1.4;}
-.safety-footer{margin:34px 0 8px;padding:20px 4px;border-top:1px solid var(--border);color:var(--muted);}
-.safety-footer div{display:flex;align-items:center;gap:8px;}
-.safety-footer h2{margin:0;color:var(--text);font-size:20px;}
-.safety-footer p{line-height:1.5;}
-.checkin-shell{width:min(100%,760px);padding-bottom:120px;}
-.checkin-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px;}
-.back-link{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;color:var(--primary-dark);cursor:pointer;font-weight:850;min-height:44px;padding:0;}
-.progress-pill{border:1px solid var(--border);background:rgba(251,253,249,.82);border-radius:999px;padding:8px 12px;font-weight:850;color:var(--primary-dark);white-space:nowrap;}
-.checkin-date{margin:14px 0;}
-.step-card{min-height:min(560px,calc(100svh - 230px));display:flex;flex-direction:column;justify-content:center;text-align:center;}
-.wide-step{text-align:left;justify-content:flex-start;min-height:auto;}
-.step-icon{width:64px;height:64px;margin:0 auto 14px;border-radius:22px;background:var(--surface-soft);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--primary-dark);}
-.step-card h1{font-size:clamp(28px,8vw,40px);line-height:1.08;max-width:720px;margin:0 auto 14px;}
-.step-value{font-size:22px;font-weight:900;margin:8px 0 18px;color:var(--primary-dark);}
-.range{width:100%;height:38px;margin-top:14px;appearance:none;background:transparent;}
-.range.jumbo{max-width:720px;margin-left:auto;margin-right:auto;}
-.range::-webkit-slider-runnable-track{height:18px;border-radius:999px;background:linear-gradient(90deg,#d9e2d7,#eef3ec,#5f7d68);border:1px solid var(--border);box-shadow:inset 0 1px 4px rgba(36,48,40,.18)}
-.range::-webkit-slider-thumb{appearance:none;width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffffff,#dfe8dc 54%,#5f7d68);border:3px solid white;margin-top:-11px;box-shadow:0 0 0 5px rgba(95,125,104,.12),0 10px 24px rgba(36,48,40,.18);cursor:pointer;}
-.range:disabled{opacity:.35;}
-.range:active::-webkit-slider-thumb{transform:scale(1.06)}
-.range::-moz-range-track{height:18px;border-radius:999px;background:linear-gradient(90deg,#d9e2d7,#eef3ec,#5f7d68);border:1px solid var(--border)}
-.range::-moz-range-thumb{width:38px;height:38px;border-radius:50%;background:#dfe8dc;border:3px solid white;box-shadow:0 10px 24px rgba(36,48,40,.18);cursor:pointer;}
-.range-labels{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;text-align:center;font-size:11px;color:var(--muted);margin:8px auto 0;max-width:760px;}
-.step-actions-inline{margin-top:24px;}
-.step-nav{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);width:min(760px,calc(100vw - 28px));display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(251,253,249,.86);border:1px solid var(--border);border-radius:24px;padding:10px;box-shadow:0 18px 60px rgba(36,48,40,.18);backdrop-filter:blur(12px);z-index:30;}
-.step-nav .button{flex:1;}
-.tag-group{margin-top:16px;}
-.tag-group h3{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--primary-dark);margin:0 0 8px;}
-.tag-wrap{display:flex;flex-wrap:wrap;gap:8px;}
-.tag{border:1px solid var(--border);color:var(--text);border-radius:999px;padding:9px 12px;cursor:pointer;background:var(--surface-soft);}
-.tag-low{background:rgba(100,116,139,.10)}.tag-active{background:rgba(192,122,74,.12)}.tag-warm{background:rgba(148,169,140,.18)}.tag-care{background:rgba(95,125,104,.14)}.tag-body{background:rgba(127,166,111,.14)}.tag-people{background:rgba(148,169,140,.16)}.tag-work{background:rgba(192,122,74,.12)}
-.tag.selected{box-shadow:inset 0 0 0 2px var(--primary);filter:brightness(1.03)}
-.checkbox-line{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted)}
-.day-one-ring{transform-origin:center;animation:stampRing .62s ease-out both;}
-.day-one-compass{transform-origin:center;animation:stampCompass .62s ease-out both;}
-.day-one-needle{transform-origin:center;animation:needleSpin 1.05s cubic-bezier(.2,.8,.2,1) .25s both;}
-.day-one-label{font-size:18px;font-weight:800;fill:var(--primary-dark);opacity:0;animation:writeIn .8s ease-out .62s forwards;}
-@keyframes stampRing{0%{transform:scale(.2);opacity:0}65%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}
-@keyframes stampCompass{0%{transform:scale(.5);opacity:0}100%{transform:scale(1);opacity:1}}
-@keyframes needleSpin{0%{transform:rotate(-140deg);opacity:.2}70%{transform:rotate(390deg);opacity:1}100%{transform:rotate(360deg);opacity:1}}
-@keyframes writeIn{0%{opacity:0;letter-spacing:.18em}100%{opacity:1;letter-spacing:0}}
-@media (min-width:760px){
-  .app-shell{width:min(100%,980px)}
-  .mobile-header{grid-template-columns:52px 1fr 52px;margin-top:12px;}
-  .menu-button{width:48px;height:48px;}
-  .checkin-cta{grid-template-columns:1fr auto;align-items:center;position:relative;bottom:auto;}
-  .checkin-cta .button{width:auto;min-width:180px;}
-  .lower-grid{grid-template-columns:1fr;}
-  .custom-range{grid-template-columns:1fr 1fr;}
-}
-@media (max-width:430px){
-  .app-shell{padding-inline:12px;}
-  .card,.date-row{border-radius:20px;padding:13px;}
-  .big-chart{max-height:48vh;}
-  .legend,.range-chip{font-size:12px;padding:8px 10px;}
-  .freq-row{grid-template-columns:76px 1fr 22px;font-size:12px;}
-  .range-labels{font-size:10px;}
-}
-@media (prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important;}
-}
+*{box-sizing:border-box}body{margin:0;background:#020617;color:white;font-family:Inter,Arial,sans-serif}.app-shell{min-height:100vh;padding:24px;max-width:1320px;margin:0 auto}.home-hero{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:18px 0 20px}.home-hero h1{font-size:64px;line-height:1;margin:6px 0}.home-hero p,.card p{color:rgba(255,255,255,.78);line-height:1.5}.eyebrow{text-transform:uppercase;letter-spacing:.3em;color:rgba(199,210,254,.78);font-size:12px}.card,.date-row{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);border-radius:24px;padding:18px;box-shadow:0 18px 60px rgba(0,0,0,.18)}.card h1,.card h2{margin:0 0 8px}.button-row,.range-header,.safety-title,.step-nav,.checkin-top{display:flex;align-items:center;gap:10px}.range-header,.checkin-top{justify-content:space-between}.button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:18px;padding:13px 18px;cursor:pointer;font-weight:850;transition:transform .08s ease,opacity .15s ease}.button:active{transform:scale(.97)}.button:disabled{opacity:.42;cursor:not-allowed}.button.primary{background:white;color:#020617}.button.secondary{background:transparent;color:white;border:1px solid rgba(255,255,255,.24)}.range-buttons,.legend-wrap,.button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.range-chip,.legend{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);color:white;border-radius:999px;padding:8px 12px;cursor:pointer}.range-chip.active,.legend.on{background:white;color:#020617}.legend span{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}.custom-range{display:flex;gap:12px;margin-top:14px}.custom-range label,.date-row label{display:flex;flex-direction:column;gap:6px;color:rgba(255,255,255,.78);font-size:13px}.custom-range input,.date-row input,textarea{background:rgba(0,0,0,.25);color:white;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:12px}textarea{width:100%;min-height:140px;resize:vertical;margin-top:14px}.chart-card{padding:20px}.chart-header h1{font-size:30px;margin:2px 0 6px}.big-chart-scroll{width:100%;overflow-x:auto;margin-top:14px}.big-chart{min-width:900px;width:100%;height:auto;display:block;border-radius:24px}.lower-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;margin-top:18px}.frequency-box{margin-top:16px}.frequency-box h3{font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.72)}.freq-row{display:grid;grid-template-columns:110px 1fr 24px;align-items:center;gap:10px;margin:9px 0}.freq-track{height:12px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden}.freq-bar{height:100%;background:linear-gradient(90deg,#c4b5fd,#fde68a);border-radius:999px}.muted{color:rgba(255,255,255,.56)}.crisis-wrap{position:fixed;right:18px;top:18px;z-index:50}.crisis-button{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.22);background:rgba(2,6,23,.78);color:white;border-radius:999px;padding:9px 12px;backdrop-filter:blur(10px);cursor:pointer}.crisis-panel{width:280px;margin-top:8px;padding:16px;border-radius:18px;background:#0f172a;border:1px solid rgba(255,255,255,.16);box-shadow:0 18px 60px rgba(0,0,0,.45)}.crisis-panel h3{margin:0 0 8px}.safety-footer{margin:42px 0 8px;padding:20px;border-top:1px solid rgba(255,255,255,.16);color:rgba(255,255,255,.72)}.safety-footer div{display:flex;align-items:center;gap:8px}.safety-footer h2{margin:0;color:white}.checkin-shell{max-width:860px}.back-link{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;color:white;cursor:pointer;font-weight:800}.progress-pill{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);border-radius:999px;padding:8px 12px}.checkin-date{margin:18px 0}.step-card{min-height:440px;display:flex;flex-direction:column;justify-content:center;text-align:center}.wide-step{text-align:left;justify-content:flex-start}.step-icon{width:70px;height:70px;margin:0 auto 14px;border-radius:24px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center}.step-card h1{font-size:34px;line-height:1.12;max-width:720px;margin:0 auto 14px}.step-value{font-size:22px;font-weight:900;margin:8px 0 18px}.range{width:100%;height:34px;margin-top:14px;appearance:none;background:transparent}.range.jumbo{max-width:720px;margin-left:auto;margin-right:auto}.range::-webkit-slider-runnable-track{height:17px;border-radius:999px;background:linear-gradient(90deg,#1e293b,#64748b,#f8fafc);border:1px solid rgba(255,255,255,.26);box-shadow:inset 0 1px 4px rgba(0,0,0,.55)}.range::-webkit-slider-thumb{appearance:none;width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffffff,#cbd5e1 50%,#64748b);border:3px solid #f8fafc;margin-top:-10px;box-shadow:0 0 0 5px rgba(255,255,255,.08),0 0 22px rgba(255,255,255,.45);cursor:pointer}.range:disabled{opacity:.35}.range:active::-webkit-slider-thumb{transform:scale(1.08)}.range::-moz-range-track{height:17px;border-radius:999px;background:linear-gradient(90deg,#1e293b,#64748b,#f8fafc);border:1px solid rgba(255,255,255,.26)}.range::-moz-range-thumb{width:36px;height:36px;border-radius:50%;background:#e5e7eb;border:3px solid #f8fafc;box-shadow:0 0 22px rgba(255,255,255,.45);cursor:pointer}.range-labels{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;text-align:center;font-size:12px;color:rgba(255,255,255,.68);margin:8px auto 0;max-width:760px}.step-actions-inline{margin-top:24px}.step-nav{justify-content:space-between;margin-top:18px}.tag-group{margin-top:16px}.tag-group h3{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:rgba(255,255,255,.76);margin:0 0 8px}.tag-wrap{display:flex;flex-wrap:wrap;gap:8px}.tag{border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.9);border-radius:999px;padding:8px 12px;cursor:pointer}.tag-low{background:rgba(100,116,139,.2)}.tag-active{background:rgba(251,113,133,.16)}.tag-warm{background:rgba(253,230,138,.14)}.tag-care{background:rgba(94,234,212,.14)}.tag-body{background:rgba(134,239,172,.14)}.tag-people{background:rgba(196,181,253,.14)}.tag-work{background:rgba(251,191,36,.14)}.tag.selected{box-shadow:inset 0 0 0 2px rgba(255,255,255,.72);filter:brightness(1.2)}.checkbox-line{display:flex;align-items:center;gap:8px;margin-top:14px;color:rgba(255,255,255,.82)}@media(max-width:900px){.app-shell{padding:16px}.home-hero{align-items:flex-start;flex-direction:column}.home-hero h1{font-size:46px}.lower-grid{grid-template-columns:1fr}.step-card h1{font-size:28px}.custom-range{flex-direction:column}.crisis-wrap{top:auto;bottom:14px;right:14px}.freq-row{grid-template-columns:90px 1fr 24px}}
 `;
