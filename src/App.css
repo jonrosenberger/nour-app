@@ -125,7 +125,6 @@ textarea{width:100%;min-height:140px;resize:vertical;margin-top:14px;}
   .app-shell{padding-inline:12px;}
   .card,.date-row{border-radius:20px;padding:13px;}
   .big-chart{min-height:240px;}
-  .chart-section{max-height:52vh;}
   .legend,.range-chip{font-size:12px;padding:8px 10px;}
   .freq-row{grid-template-columns:76px 1fr 22px;font-size:12px;}
   .range-labels{font-size:10px;}
