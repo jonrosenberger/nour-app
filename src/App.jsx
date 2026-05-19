@@ -53,6 +53,7 @@ const APP_CONFIG = {
 const FEATURE_FLAGS = {
   enforceBackdatingLimit: false,
   maxBackdateDays: 3,
+  tagsInCheckin: false,
 };
 
 const TRACKERS = [
@@ -332,10 +333,9 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
   const series = [
     { key: "composite", label: "Composite", color: "#111827", width: 3.5 },
     { key: "compositeTrend", label: "Overall path", color: "#b45309", width: 9 },
-
     ...FIELDS.map((field) => ({ key: field.key, label: field.label, color: field.color, width: 2.5 })),
   ];
- 
+
   const activeSeries = series.filter((item) => (item.key === "compositeTrend" ? visible.trend : visible[item.key]));
   const dayOneRow = rows.length === 1 && typeof rows[0]?.composite === "number" ? rows[0] : null;
   const dayOneX = dayOneRow ? xFor(0) : null;
@@ -514,7 +514,8 @@ function NotesStep({ note, setNote, includeNotesInExport, setIncludeNotesInExpor
 
 function CheckInPage({ date, setDate, draft, setDraft, existingEntry, onSave, onCancel, saveState }) {
   const [step, setStep] = useState(0);
-  const totalSteps = FIELDS.length + 3;
+  const tagStepCount = FEATURE_FLAGS.tagsInCheckin ? 2 : 0;
+  const totalSteps = FIELDS.length + tagStepCount + 1;
   const currentField = FIELDS[step];
 
   function updateValue(key, value) {
@@ -536,8 +537,9 @@ function CheckInPage({ date, setDate, draft, setDraft, existingEntry, onSave, on
       <div className="date-row checkin-date"><label>Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label></div>
 
       {currentField && <SliderStep field={currentField} value={draft.fields[currentField.key] ?? 50} skipped={draft.skippedFields[currentField.key]} onValue={updateValue} onSkip={skipField} onUnskip={unskipField} />}
-      {step === FIELDS.length && <TagGroupPicker title="Feelings" subtitle="Click any that fit. These labels do not affect the chart score." groups={FEELING_GROUPS} selected={draft.feelings} setSelected={(fn) => setDraft((prev) => ({ ...prev, feelings: typeof fn === "function" ? fn(prev.feelings) : fn }))} />}
-      {step === FIELDS.length + 1 && <TagGroupPicker title="Events" subtitle="Optional context for memory or export. These do not affect the chart score." groups={EVENT_GROUPS} selected={draft.events} setSelected={(fn) => setDraft((prev) => ({ ...prev, events: typeof fn === "function" ? fn(prev.events) : fn }))} />}
+      {FEATURE_FLAGS.tagsInCheckin && step === FIELDS.length && <TagGroupPicker title="Feelings" subtitle="Click any that fit. These labels do not affect the chart score." groups={FEELING_GROUPS} selected={draft.feelings} setSelected={(fn) => setDraft((prev) => ({ ...prev, feelings: typeof fn === "function" ? fn(prev.feelings) : fn }))} />}
+      {FEATURE_FLAGS.tagsInCheckin && step === FIELDS.length + 1 && <TagGroupPicker title="Events" subtitle="Optional context for memory or export. These do not affect the chart score." groups={EVENT_GROUPS} selected={draft.events} setSelected={(fn) => setDraft((prev) => ({ ...prev, events: typeof fn === "function" ? fn(prev.events) : fn }))} />}
+      {step === FIELDS.length + tagStepCount && <NotesStep note={draft.note} setNote={(note) => setDraft((prev) => ({ ...prev, note }))} includeNotesInExport={draft.includeNotesInExport} setIncludeNotesInExport={(includeNotesInExport) => setDraft((prev) => ({ ...prev, includeNotesInExport }))} />}
       {step === FIELDS.length + 2 && <NotesStep note={draft.note} setNote={(note) => setDraft((prev) => ({ ...prev, note }))} includeNotesInExport={draft.includeNotesInExport} setIncludeNotesInExport={(includeNotesInExport) => setDraft((prev) => ({ ...prev, includeNotesInExport }))} />}
 
       {saveState === "error" && <p className="save-error">Nour could not save this entry. Your browser storage may be full or unavailable.</p>}
