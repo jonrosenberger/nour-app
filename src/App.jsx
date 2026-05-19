@@ -67,7 +67,7 @@ const TRACKERS = [
     midRight: "Good",
     right: "Very good",
     icon: Heart,
-    color: "#ec4899",
+    color: "#be185d",
     enabledInV1: true,
   },
   {
@@ -93,7 +93,7 @@ const TRACKERS = [
     midRight: "Calm",
     right: "Very calm",
     icon: Sparkles,
-    color: "#38bdf8",
+    color: "#0e7490",
     enabledInV1: false,
   },
   {
@@ -106,7 +106,7 @@ const TRACKERS = [
     midRight: "Kind",
     right: "Supportive",
     icon: FileText,
-    color: "#fb7185",
+    color: "#0f766e",
     enabledInV1: true,
   },
   {
@@ -119,7 +119,7 @@ const TRACKERS = [
     midRight: "Connected",
     right: "Supported",
     icon: Sparkles,
-    color: "#a78bfa",
+    color: "#6d28d9",
     enabledInV1: false,
   },
   {
@@ -132,7 +132,7 @@ const TRACKERS = [
     midRight: "Rested",
     right: "Restored",
     icon: Moon,
-    color: "#34d399",
+    color: "#166534",
     enabledInV1: false,
   },
 ];
@@ -331,8 +331,8 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
   const yFor = (value) => pad.top + ((100 - value) / 100) * innerH;
 
   const series = [
-    { key: "composite", label: "Composite", color: "#111827", width: 3.5 },
-    { key: "compositeTrend", label: "Overall path", color: "#b45309", width: 9 },
+    { key: "composite", label: "Composite", color: "#3b2a6e", width: 3.5 },
+    { key: "compositeTrend", label: "Overall path", color: "#7c3aed", width: 9 },
     ...FIELDS.map((field) => ({ key: field.key, label: field.label, color: field.color, width: 2.5 })),
   ];
 
@@ -347,11 +347,11 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
         <svg viewBox={`0 0 ${width} ${height}`} className="big-chart" role="img" aria-label="Mood tracking chart">
           <defs>
             <pattern id="smallGrid" width="18" height="18" patternUnits="userSpaceOnUse">
-              <path d="M 18 0 L 0 0 0 18" fill="none" stroke="rgba(51,65,85,0.18)" strokeWidth="1" />
+              <path d="M 18 0 L 0 0 0 18" fill="none" stroke="rgba(100,70,160,.10)" strokeWidth="1" />
             </pattern>
             <pattern id="bigGrid" width="90" height="90" patternUnits="userSpaceOnUse">
               <rect width="90" height="90" fill="url(#smallGrid)" />
-              <path d="M 90 0 L 0 0 0 90" fill="none" stroke="rgba(69,115,141,0.36)" strokeWidth="2" />
+              <path d="M 90 0 L 0 0 0 90" fill="none" stroke="rgba(100,70,160,.20)" strokeWidth="2" />
             </pattern>
             <filter id="pencil">
               <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" result="noise" />
@@ -359,14 +359,14 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
             </filter>
           </defs>
           <rect x="0" y="0" width={width} height={height} rx="0" fill="#f8f1df" />
-          <rect x={pad.left} y={pad.top} width={innerW} height={innerH} fill="url(#bigGrid)" stroke="#45738d" strokeWidth="3" />
+          <rect x={pad.left} y={pad.top} width={innerW} height={innerH} fill="url(#bigGrid)" stroke="rgba(100,70,160,.35)" strokeWidth="3" />
 
           {[0, 25, 50, 75, 100].map((value) => (
-            <line key={value} x1={pad.left} x2={pad.left + innerW} y1={yFor(value)} y2={yFor(value)} stroke={value === 50 ? "#111827" : "rgba(17,24,39,.45)"} strokeDasharray={value === 50 ? "8 8" : ""} strokeWidth={value === 50 ? 2.5 : 1.4} />
+            <line key={value} x1={pad.left} x2={pad.left + innerW} y1={yFor(value)} y2={yFor(value)} stroke={value === 50 ? "rgba(100,70,160,.7)" : "rgba(100,70,160,.18)"} strokeDasharray={value === 50 ? "8 8" : ""} strokeWidth={value === 50 ? 2.5 : 1.4} />
           ))}
-          <text x={pad.left + 8} y={yFor(100) + 16} textAnchor="start" fontSize="14" fill="#111827" fontWeight="800">Feeling better</text>
-          <text x={pad.left + 8} y={yFor(0) - 6} textAnchor="start" fontSize="14" fill="#111827" fontWeight="800">Feeling worse</text>
-          <text x={pad.left + 8} y={yFor(50) - 8} fontSize="14" fill="#111827" fontWeight="800">personal neutral line</text>
+          <text x={pad.left + 8} y={yFor(100) + 16} textAnchor="start" fontSize="14" fill="rgba(80,50,130,.6)" fontWeight="800">Feeling better</text>
+          <text x={pad.left + 8} y={yFor(0) - 6} textAnchor="start" fontSize="14" fill="rgba(80,50,130,.6)" fontWeight="800">Feeling worse</text>
+          <text x={pad.left + 8} y={yFor(50) - 8} fontSize="14" fill="rgba(80,50,130,.6)" fontWeight="800">personal neutral line</text>
 
           {activeSeries.map((item) => {
             const path = makePath(rows.map((row, index) => ({ x: xFor(index), y: yFor(row[item.key] ?? 0), value: row[item.key] })));
@@ -387,10 +387,10 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
               <line className="day-one-needle" x1="0" y1="0" x2="0" y2="-11" stroke="#c07a4a" strokeWidth="3" strokeLinecap="round" />
               <text className="day-one-label" x="0" y="48" textAnchor="middle">Day 1. Start of my journey.</text>
             </g>
-          ) : rows.map((row, index) => typeof row.composite === "number" ? <circle key={row.date} cx={xFor(index)} cy={yFor(row.composite)} r="4" fill="#243028" opacity=".85" /> : null)}
+          ) : rows.map((row, index) => typeof row.composite === "number" ? <circle key={row.date} cx={xFor(index)} cy={yFor(row.composite)} r="4" fill="#3b2a6e" opacity=".85" /> : null)}
           {rows.map((row, index) => {
             const showLabel = rows.length <= 12 || index === 0 || index === rows.length - 1 || index % Math.ceil(rows.length / 8) === 0;
-            return showLabel ? <text key={`label-${row.date}`} x={xFor(index)} y={height - 26} textAnchor="middle" fontSize="12" fill="#111827" fontWeight="700">{row.date.slice(5)}</text> : null;
+            return showLabel ? <text key={`label-${row.date}`} x={xFor(index)} y={height - 26} textAnchor="middle" fontSize="12" fill="rgba(80,50,130,.7)" fontWeight="700">{row.date.slice(5)}</text> : null;
           })}
         </svg>
       </div>
@@ -399,7 +399,7 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
         <div className="chart-controls-label">Chart options</div>
         <div className="legend-wrap">
           <button className={visible.composite ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, composite: !v.composite }))}>
-            <span style={{ background: "#111827" }} /> Composite
+            <span style={{ background: "#3b2a6e" }} /> Composite
           </button>
           <button className={visible.trend ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, trend: !v.trend }))}>
             <span style={{ background: "#b45309" }} /> Overall path
@@ -600,14 +600,14 @@ function buildExportHTML({ rows, entries, rangeLabel, includeNotes }) {
       <h1>${APP_CONFIG.appName}</h1><p class="subtitle">${rangeLabel} reflection export</p>
       <div class="card"><svg viewBox="0 0 ${width} ${height}">
         <rect x="0" y="0" width="${width}" height="${height}" rx="24" fill="#f8f1df"/>
-        <rect x="${pad.left}" y="${pad.top}" width="${innerW}" height="${innerH}" fill="#eef6f6" stroke="#45738d" stroke-width="3"/>
-        ${[0,25,50,75,100].map(v => `<line x1="${pad.left}" x2="${pad.left+innerW}" y1="${yFor(v)}" y2="${yFor(v)}" stroke="#111827" stroke-opacity="${v===50 ? .8 : .25}" stroke-width="${v===50 ? 2.4 : 1.2}" stroke-dasharray="${v===50 ? '8 8' : ''}"/>`).join('')}
-        <text x="${pad.left-12}" y="${yFor(100)+4}" text-anchor="end" font-size="12" font-weight="700">Feeling better</text>
-        <text x="${pad.left-12}" y="${yFor(0)+4}" text-anchor="end" font-size="12" font-weight="700">Feeling worse</text>
-        <path d="${compositePath}" fill="none" stroke="#111827" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".82"/>
-        <path d="${trendPath}" fill="none" stroke="#b45309" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".92"/>
-        ${rows.map((row,i)=> typeof row.composite === 'number' ? `<circle cx="${xFor(i)}" cy="${yFor(row.composite)}" r="4" fill="#111827"/>` : '').join('')}
-        <text x="${pad.left+8}" y="${yFor(50)-8}" font-size="13" font-weight="800">personal neutral line</text>
+        <rect x="${pad.left}" y="${pad.top}" width="${innerW}" height="${innerH}" fill="#eef6f6" stroke="rgba(100,70,160,.35)" stroke-width="3"/>
+        ${[0,25,50,75,100].map(v => `<line x1="${pad.left}" x2="${pad.left+innerW}" y1="${yFor(v)}" y2="${yFor(v)}" stroke="rgba(100,70,160,${v===50 ? .7 : .18})" stroke-width="${v===50 ? 2.4 : 1.2}" stroke-dasharray="${v===50 ? '8 8' : ''}"/>`).join('')}
+        <text x="${pad.left+8}" y="${yFor(100)+16}" text-anchor="start" font-size="12" fill="rgba(80,50,130,.6)" font-weight="700">Feeling better</text>
+        <text x="${pad.left+8}" y="${yFor(0)-6}" text-anchor="start" font-size="12" fill="rgba(80,50,130,.6)" font-weight="700">Feeling worse</text>
+        <path d="${compositePath}" fill="none" stroke="#3b2a6e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".82"/>
+        <path d="${trendPath}" fill="none" stroke="#7c3aed" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".92"/>
+        ${rows.map((row,i)=> typeof row.composite === 'number' ? `<circle cx="${xFor(i)}" cy="${yFor(row.composite)}" r="4" fill="#3b2a6e"/>` : '').join('')}
+        <text x="${pad.left+8}" y="${yFor(50)-8}" font-size="13" font-weight="800" fill="rgba(80,50,130,.6)">personal neutral line</text>
       </svg><p><b>Dark line:</b> daily composite. <b>Gold line:</b> smoothed overall path.</p></div>
       ${includeNotes && notes ? `<div class="card"><h2>Notes</h2><ul>${notes}</ul></div>` : ""}
       <div class="footer">Generated locally by the user. Data stays on the device unless exported. User-entered record only; not a diagnosis, treatment plan, clinical assessment, or emergency service.</div>
