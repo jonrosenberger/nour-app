@@ -323,7 +323,7 @@ function makePath(points) {
 
 function MoodChart({ rows, visible, setVisible, animateDayOne }) {
   const width = 1080;
-  const height = 520;
+  const height = 1040;
   const pad = { top: 42, right: 30, bottom: 60, left: 62 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
