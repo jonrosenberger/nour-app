@@ -342,15 +342,7 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
   const dayOneY = dayOneRow ? yFor(dayOneRow.composite) : null;
 
   return (
-    <Card className="chart-card">
-      <div className="chart-header">
-        <div>
-          <p className="eyebrow">Graph</p>
-          <h1>{APP_CONFIG.appName}</h1>
-          <p>Daily composite plus a smoothed overall path. No interpretation; just your recorded data.</p>
-        </div>
-      </div>
-
+    <div className="chart-section">
       <div className="big-chart-scroll">
         <svg viewBox={`0 0 ${width} ${height}`} className="big-chart" role="img" aria-label="Mood tracking chart">
           <defs>
@@ -366,14 +358,14 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
               <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.8" />
             </filter>
           </defs>
-          <rect x="0" y="0" width={width} height={height} rx="26" fill="#f8f1df" />
+          <rect x="0" y="0" width={width} height={height} rx="0" fill="#f8f1df" />
           <rect x={pad.left} y={pad.top} width={innerW} height={innerH} fill="url(#bigGrid)" stroke="#45738d" strokeWidth="3" />
 
           {[0, 25, 50, 75, 100].map((value) => (
             <line key={value} x1={pad.left} x2={pad.left + innerW} y1={yFor(value)} y2={yFor(value)} stroke={value === 50 ? "#111827" : "rgba(17,24,39,.45)"} strokeDasharray={value === 50 ? "8 8" : ""} strokeWidth={value === 50 ? 2.5 : 1.4} />
           ))}
-          <text x={pad.left - 12} y={yFor(100) + 4} textAnchor="end" fontSize="14" fill="#111827" fontWeight="800">Feeling better</text>
-          <text x={pad.left - 12} y={yFor(0) + 4} textAnchor="end" fontSize="14" fill="#111827" fontWeight="800">Feeling worse</text>
+          <text x={pad.left + 8} y={yFor(100) + 16} textAnchor="start" fontSize="14" fill="#111827" fontWeight="800">Feeling better</text>
+          <text x={pad.left + 8} y={yFor(0) - 6} textAnchor="start" fontSize="14" fill="#111827" fontWeight="800">Feeling worse</text>
           <text x={pad.left + 8} y={yFor(50) - 8} fontSize="14" fill="#111827" fontWeight="800">personal neutral line</text>
 
           {activeSeries.map((item) => {
@@ -403,20 +395,23 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
         </svg>
       </div>
 
+      <div className="chart-legend-row">
         <div className="chart-controls-label">Chart options</div>
-      <div className="legend-wrap">
-        <button className={visible.composite ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, composite: !v.composite }))}>
-          <span style={{ background: "#111827" }} /> Composite
-        </button>
-        <button className={visible.trend ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, trend: !v.trend }))}>
-          <span style={{ background: "#b45309" }} /> Overall path
-        </button>
-        {FIELDS.map((field) => (
-          <button key={field.key} className={visible[field.key] ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, [field.key]: !v[field.key] }))}>
-            <span style={{ background: field.color }} /> {field.label}
+        <div className="legend-wrap">
+          <button className={visible.composite ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, composite: !v.composite }))}>
+            <span style={{ background: "#111827" }} /> Composite
           </button>
-        ))}
-      </div>    </Card>
+          <button className={visible.trend ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, trend: !v.trend }))}>
+            <span style={{ background: "#b45309" }} /> Overall path
+          </button>
+          {FIELDS.map((field) => (
+            <button key={field.key} className={visible[field.key] ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, [field.key]: !v[field.key] }))}>
+              <span style={{ background: field.color }} /> {field.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
