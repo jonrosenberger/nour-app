@@ -364,9 +364,9 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
           {[0, 25, 50, 75, 100].map((value) => (
             <line key={value} x1={pad.left} x2={pad.left + innerW} y1={yFor(value)} y2={yFor(value)} stroke={value === 50 ? "rgba(100,70,160,.7)" : "rgba(100,70,160,.18)"} strokeDasharray={value === 50 ? "8 8" : ""} strokeWidth={value === 50 ? 2.5 : 1.4} />
           ))}
-          <text x={pad.left + 8} y={yFor(100) + 16} textAnchor="start" fontSize="14" fill="rgba(80,50,130,.6)" fontWeight="800">Feeling better</text>
-          <text x={pad.left + 8} y={yFor(0) - 6} textAnchor="start" fontSize="14" fill="rgba(80,50,130,.6)" fontWeight="800">Feeling worse</text>
-          <text x={pad.left + 8} y={yFor(50) - 8} fontSize="14" fill="rgba(80,50,130,.6)" fontWeight="800">personal neutral line</text>
+          <text x={pad.left + 8} y={yFor(100) + 36} textAnchor="start" fontSize="42" fill="rgba(80,50,130,.7)" fontWeight="800">Feeling better</text>
+<text x={pad.left + 8} y={yFor(0) - 16} textAnchor="start" fontSize="42" fill="rgba(80,50,130,.7)" fontWeight="800">Feeling worse</text>
+<text x={pad.left + 8} y={yFor(50) - 14} fontSize="36" fill="rgba(80,50,130,.6)" fontWeight="700">personal neutral line</text>
 
           {activeSeries.map((item) => {
             const path = makePath(rows.map((row, index) => ({ x: xFor(index), y: yFor(row[item.key] ?? 0), value: row[item.key] })));
