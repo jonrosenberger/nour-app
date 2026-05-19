@@ -323,7 +323,7 @@ function makePath(points) {
 
 function MoodChart({ rows, visible, setVisible, animateDayOne }) {
   const width = 1080;
-  const height = 1040;
+  const height = 520;
   const pad = { top: 42, right: 30, bottom: 60, left: 62 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
@@ -632,7 +632,8 @@ function parseImportedEntries(text) {
     const row = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
     const fields = {};
     FIELDS.forEach((field) => {
-      const raw = row[field.key] ?? row[field.label] ?? row[field.label.toLowerCase()];
+      const snakeKey = field.key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      const raw = row[field.key] ?? row[snakeKey] ?? row[field.label] ?? row[field.label.toLowerCase()];
       const value = Number(raw);
       fields[field.key] = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null;
     });
@@ -744,6 +745,7 @@ export default function App() {
 
   function importEntriesFile(event) {
     const file = event.target.files?.[0];
+    const inputEl = event.target;
     if (!file) return;
 
     const reader = new FileReader();
@@ -761,13 +763,18 @@ export default function App() {
           return;
         }
         setEntries(merged);
+        window.alert(`Imported ${imported.length} entries.`);
         setMenuOpen(false);
       } catch (error) {
         console.error("Unable to import Nour entries", error);
         window.alert("Nour could not read that import file.");
       } finally {
-        event.target.value = "";
+        inputEl.value = "";
       }
+    };
+    reader.onerror = () => {
+      window.alert("Nour could not read that file.");
+      inputEl.value = "";
     };
     reader.readAsText(file);
   }
