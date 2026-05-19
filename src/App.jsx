@@ -60,9 +60,9 @@ const TRACKERS = [
   {
     key: "mood",
     label: "Mood",
-    prompt: "How was your emotional weather today?",
-    left: "Very hard",
-    midLeft: "Hard",
+    prompt: "How was your overall mood today?",
+    left: "Very down",
+    midLeft: "Down",
     center: "Neutral",
     midRight: "Good",
     right: "Very good",
@@ -171,14 +171,21 @@ const RANGE_OPTIONS = [
   { key: "custom", label: "Custom", days: null },
 ];
 
+function formatLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return formatLocalDate(new Date());
 }
 
 function addDaysISO(dateISO, amount) {
   const date = new Date(`${dateISO}T00:00:00`);
   date.setDate(date.getDate() + amount);
-  return date.toISOString().slice(0, 10);
+  return formatLocalDate(date);
 }
 
 function uid() {
@@ -249,6 +256,23 @@ function movingAverage(rows, key, windowSize) {
   });
 }
 
+function smoothingWindowForRange(rangeMode) {
+  if (rangeMode === "week") return 3;
+  if (rangeMode === "month") return 7;
+  if (rangeMode === "sixMonths") return 14;
+  if (rangeMode === "year") return 21;
+  if (rangeMode === "all") return 30;
+  return 7;
+}
+
+function emptyChartRow(date, position) {
+  const row = { date, skippedDay: false, composite: null, compositeTrend: null, isPadding: position };
+  FIELDS.forEach((field) => {
+    row[field.key] = null;
+  });
+  return row;
+}
+
 function buildChartRows(entries, rangeMode, customStart, customEnd, today) {
   const sorted = entries.slice().sort((a, b) => a.date.localeCompare(b.date));
   const selected = RANGE_OPTIONS.find((range) => range.key === rangeMode);
@@ -276,7 +300,16 @@ function buildChartRows(entries, rangeMode, customStart, customEnd, today) {
       return row;
     });
 
-  return movingAverage(rows, "composite", rangeMode === "week" ? 3 : 7);
+  const trendedRows = movingAverage(rows, "composite", smoothingWindowForRange(rangeMode));
+  if (!trendedRows.length) return trendedRows;
+
+  const futurePadding = rangeMode === "week" ? 2 : 3;
+  const rightPadding = Array.from({ length: futurePadding }, (_, index) => emptyChartRow(addDaysISO(trendedRows[trendedRows.length - 1].date, index + 1), "future"));
+
+  if (rangeMode !== "all") return [...trendedRows, ...rightPadding];
+
+  const leftPadding = [emptyChartRow(addDaysISO(trendedRows[0].date, -2), "past"), emptyChartRow(addDaysISO(trendedRows[0].date, -1), "past")];
+  return [...leftPadding, ...trendedRows, ...rightPadding];
 }
 
 // V2 analytics scaffold: retained for future tag/context views, but not a V1 primary feature.
@@ -328,17 +361,23 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
   const xFor = (index) => pad.left + (rows.length <= 1 ? innerW / 2 : (index / (rows.length - 1)) * innerW);
-  const yFor = (value) => pad.top + ((100 - value) / 100) * innerH;
+  const yMin = -8;
+  const yMax = 108;
+  const yFor = (value) => pad.top + ((yMax - value) / (yMax - yMin)) * innerH;
+  const realRows = rows.filter((row) => !row.isPadding);
+  const denseRange = realRows.length > 31;
+  const longRange = realRows.length > 90;
+  const compositeWidth = denseRange ? 1.6 : 2.4;
+  const compositeOpacity = longRange ? 0.28 : denseRange ? 0.42 : 0.58;
+  const showCompositeDots = visible.composite && realRows.length <= 31;
 
-  const series = [
-    { key: "composite", label: "Composite", color: "#3b2a6e", width: 3.5 },
-    { key: "compositeTrend", label: "Overall path", color: "#7c3aed", width: 9 },
-    ...FIELDS.map((field) => ({ key: field.key, label: field.label, color: field.color, width: 2.5 })),
-  ];
-
-  const activeSeries = series.filter((item) => (item.key === "compositeTrend" ? visible.trend : visible[item.key]));
-  const dayOneRow = rows.length === 1 && typeof rows[0]?.composite === "number" ? rows[0] : null;
-  const dayOneX = dayOneRow ? xFor(0) : null;
+  const fieldSeries = FIELDS.map((field) => ({ key: field.key, label: field.label, color: field.color, width: 2.5, opacity: 0.54 }));
+  const visibleFieldSeries = fieldSeries.filter((item) => visible[item.key]);
+  const showCompositeLine = visible.composite;
+  const showTrendLine = visible.trend;
+  const dayOneRow = realRows.length === 1 && typeof realRows[0]?.composite === "number" ? realRows[0] : null;
+  const dayOneIndex = dayOneRow ? rows.findIndex((row) => row.date === dayOneRow.date) : -1;
+  const dayOneX = dayOneRow ? xFor(dayOneIndex) : null;
   const dayOneY = dayOneRow ? yFor(dayOneRow.composite) : null;
 
   return (
@@ -357,27 +396,52 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
               <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" result="noise" />
               <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.8" />
             </filter>
+            <filter id="paperTexture">
+              <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" result="paper" />
+              <feColorMatrix type="saturate" values="0" />
+            </filter>
+            <filter id="trendGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="7" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
           <rect x="0" y="0" width={width} height={height} rx="0" fill="#f8f1df" />
-          <rect x={pad.left} y={pad.top} width={innerW} height={innerH} fill="url(#bigGrid)" stroke="rgba(100,70,160,.35)" strokeWidth="3" />
+          <rect x="0" y="0" width={width} height={height} filter="url(#paperTexture)" opacity=".08" />
+          <rect x={pad.left} y={pad.top} width={innerW} height={innerH} fill="url(#bigGrid)" stroke="rgba(100,70,160,.46)" strokeWidth="3.5" />
 
           {[0, 25, 50, 75, 100].map((value) => (
             <line key={value} x1={pad.left} x2={pad.left + innerW} y1={yFor(value)} y2={yFor(value)} stroke={value === 50 ? "rgba(100,70,160,.7)" : "rgba(100,70,160,.18)"} strokeDasharray={value === 50 ? "8 8" : ""} strokeWidth={value === 50 ? 2.5 : 1.4} />
           ))}
-          <text x={pad.left + 8} y={yFor(100) + 36} textAnchor="start" fontSize="42" fill="rgba(80,50,130,.7)" fontWeight="800">Feeling better</text>
-<text x={pad.left + 8} y={yFor(0) - 16} textAnchor="start" fontSize="42" fill="rgba(80,50,130,.7)" fontWeight="800">Feeling worse</text>
-<text x={pad.left + 8} y={yFor(50) - 14} fontSize="36" fill="rgba(80,50,130,.6)" fontWeight="700">personal neutral line</text>
-
-          {activeSeries.map((item) => {
+          {visibleFieldSeries.map((item) => {
             const path = makePath(rows.map((row, index) => ({ x: xFor(index), y: yFor(row[item.key] ?? 0), value: row[item.key] })));
             if (!path) return null;
+            return <path key={item.key} d={path} fill="none" stroke={item.color} strokeWidth={item.width} strokeLinecap="round" strokeLinejoin="round" opacity={item.opacity} />;
+          })}
+
+          {showCompositeLine && (() => {
+            const path = makePath(rows.map((row, index) => ({ x: xFor(index), y: yFor(row.composite ?? 0), value: row.composite })));
+            if (!path) return null;
             return (
-              <g key={item.key} filter={item.key === "compositeTrend" || item.key === "composite" ? "url(#pencil)" : ""}>
-                <path d={path} fill="none" stroke={item.color} strokeWidth={item.width + 2} strokeLinecap="round" strokeLinejoin="round" opacity="0.16" />
-                <path d={path} fill="none" stroke={item.color} strokeWidth={item.width} strokeLinecap="round" strokeLinejoin="round" opacity={item.key === "compositeTrend" ? 0.9 : 0.76} />
+              <g filter="url(#pencil)">
+                <path d={path} fill="none" stroke="#3b2a6e" strokeWidth={compositeWidth + 1.5} strokeLinecap="round" strokeLinejoin="round" opacity="0.10" />
+                <path d={path} fill="none" stroke="#3b2a6e" strokeWidth={compositeWidth} strokeLinecap="round" strokeLinejoin="round" opacity={compositeOpacity} />
               </g>
             );
-          })}
+          })()}
+
+          {showTrendLine && (() => {
+            const path = makePath(rows.map((row, index) => ({ x: xFor(index), y: yFor(row.compositeTrend ?? 0), value: row.compositeTrend })));
+            if (!path) return null;
+            return (
+              <g filter="url(#trendGlow)">
+                <path d={path} fill="none" stroke="#7c3aed" strokeWidth="15" strokeLinecap="round" strokeLinejoin="round" opacity="0.14" />
+                <path d={path} fill="none" stroke="#7c3aed" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" opacity="0.94" />
+              </g>
+            );
+          })()}
 
           {dayOneRow ? (
             <g className={animateDayOne ? "day-one-marker animate" : "day-one-marker"} transform={`translate(${dayOneX} ${dayOneY})`}>
@@ -387,9 +451,15 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
               <line className="day-one-needle" x1="0" y1="0" x2="0" y2="-11" stroke="#c07a4a" strokeWidth="3" strokeLinecap="round" />
               <text className="day-one-label" x="0" y="48" textAnchor="middle">Day 1. Start of my journey.</text>
             </g>
-          ) : rows.map((row, index) => typeof row.composite === "number" ? <circle key={row.date} cx={xFor(index)} cy={yFor(row.composite)} r="4" fill="#3b2a6e" opacity=".85" /> : null)}
+          ) : showCompositeDots ? rows.map((row, index) => typeof row.composite === "number" ? <circle key={row.date} cx={xFor(index)} cy={yFor(row.composite)} r="3.5" fill="#3b2a6e" opacity=".58" /> : null) : null}
+
+          <text x={pad.left + 8} y={yFor(100) + 36} textAnchor="start" fontSize="42" fill="rgba(80,50,130,.72)" fontWeight="900" stroke="#f8f1df" strokeWidth="8" paintOrder="stroke">Feeling better</text>
+          <text x={pad.left + 8} y={yFor(0) - 16} textAnchor="start" fontSize="42" fill="rgba(80,50,130,.72)" fontWeight="900" stroke="#f8f1df" strokeWidth="8" paintOrder="stroke">Feeling worse</text>
+          <text x={pad.left + 8} y={yFor(50) - 14} fontSize="36" fill="rgba(80,50,130,.66)" fontWeight="800" stroke="#f8f1df" strokeWidth="7" paintOrder="stroke">personal neutral line</text>
+
           {rows.map((row, index) => {
-            const showLabel = rows.length <= 12 || index === 0 || index === rows.length - 1 || index % Math.ceil(rows.length / 8) === 0;
+            if (row.isPadding) return null;
+            const showLabel = realRows.length <= 12 || index === rows.findIndex((item) => !item.isPadding) || index === rows.findLastIndex((item) => !item.isPadding) || index % Math.ceil(rows.length / 8) === 0;
             return showLabel ? <text key={`label-${row.date}`} x={xFor(index)} y={height - 26} textAnchor="middle" fontSize="12" fill="rgba(80,50,130,.7)" fontWeight="700">{row.date.slice(5)}</text> : null;
           })}
         </svg>
@@ -402,7 +472,7 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
             <span style={{ background: "#3b2a6e" }} /> Composite
           </button>
           <button className={visible.trend ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, trend: !v.trend }))}>
-            <span style={{ background: "#b45309" }} /> Overall path
+            <span style={{ background: "#7c3aed" }} /> Overall path
           </button>
           {FIELDS.map((field) => (
             <button key={field.key} className={visible[field.key] ? "legend on" : "legend"} onClick={() => setVisible((v) => ({ ...v, [field.key]: !v[field.key] }))}>
@@ -527,7 +597,6 @@ function CheckInPage({ date, setDate, draft, setDraft, existingEntry, onSave, on
 
   return (
     <main className="app-shell checkin-shell">
-      <CrisisSupport />
       <div className="checkin-top"><button className="back-link" onClick={onCancel}><ArrowLeft size={18} /> Back to chart</button><div className="progress-pill">{Math.min(step + 1, totalSteps)} of {totalSteps}</div></div>
       <div className="date-row checkin-date"><label>Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label></div>
 
@@ -535,7 +604,6 @@ function CheckInPage({ date, setDate, draft, setDraft, existingEntry, onSave, on
       {FEATURE_FLAGS.tagsInCheckin && step === FIELDS.length && <TagGroupPicker title="Feelings" subtitle="Click any that fit. These labels do not affect the chart score." groups={FEELING_GROUPS} selected={draft.feelings} setSelected={(fn) => setDraft((prev) => ({ ...prev, feelings: typeof fn === "function" ? fn(prev.feelings) : fn }))} />}
       {FEATURE_FLAGS.tagsInCheckin && step === FIELDS.length + 1 && <TagGroupPicker title="Events" subtitle="Optional context for memory or export. These do not affect the chart score." groups={EVENT_GROUPS} selected={draft.events} setSelected={(fn) => setDraft((prev) => ({ ...prev, events: typeof fn === "function" ? fn(prev.events) : fn }))} />}
       {step === FIELDS.length + tagStepCount && <NotesStep note={draft.note} setNote={(note) => setDraft((prev) => ({ ...prev, note }))} includeNotesInExport={draft.includeNotesInExport} setIncludeNotesInExport={(includeNotesInExport) => setDraft((prev) => ({ ...prev, includeNotesInExport }))} />}
-      {step === FIELDS.length + 2 && <NotesStep note={draft.note} setNote={(note) => setDraft((prev) => ({ ...prev, note }))} includeNotesInExport={draft.includeNotesInExport} setIncludeNotesInExport={(includeNotesInExport) => setDraft((prev) => ({ ...prev, includeNotesInExport }))} />}
 
       {saveState === "error" && <p className="save-error">Nour could not save this entry. Your browser storage may be full or unavailable.</p>}
       <div className="step-nav">
@@ -586,7 +654,9 @@ function buildExportHTML({ rows, entries, rangeLabel, includeNotes }) {
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
   const xFor = (index) => pad.left + (rows.length <= 1 ? innerW / 2 : (index / (rows.length - 1)) * innerW);
-  const yFor = (value) => pad.top + ((100 - value) / 100) * innerH;
+  const yMin = -8;
+  const yMax = 108;
+  const yFor = (value) => pad.top + ((yMax - value) / (yMax - yMin)) * innerH;
   const compositePath = makePath(rows.map((row, i) => ({ x: xFor(i), y: yFor(row.composite ?? 0), value: row.composite })));
   const trendPath = makePath(rows.map((row, i) => ({ x: xFor(i), y: yFor(row.compositeTrend ?? 0), value: row.compositeTrend })));
   const dates = new Set(rows.map((row) => row.date));
@@ -608,7 +678,7 @@ function buildExportHTML({ rows, entries, rangeLabel, includeNotes }) {
         <path d="${trendPath}" fill="none" stroke="#7c3aed" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".92"/>
         ${rows.map((row,i)=> typeof row.composite === 'number' ? `<circle cx="${xFor(i)}" cy="${yFor(row.composite)}" r="4" fill="#3b2a6e"/>` : '').join('')}
         <text x="${pad.left+8}" y="${yFor(50)-8}" font-size="13" font-weight="800" fill="rgba(80,50,130,.6)">personal neutral line</text>
-      </svg><p><b>Dark line:</b> daily composite. <b>Gold line:</b> smoothed overall path.</p></div>
+      </svg><p><b>Dark line:</b> daily composite. <b>Violet line:</b> smoothed overall path.</p></div>
       ${includeNotes && notes ? `<div class="card"><h2>Notes</h2><ul>${notes}</ul></div>` : ""}
       <div class="footer">Generated locally by the user. Data stays on the device unless exported. User-entered record only; not a diagnosis, treatment plan, clinical assessment, or emergency service.</div>
       <script>window.print()</script>
@@ -673,9 +743,10 @@ export default function App() {
   const [draft, setDraft] = useState(() => buildDraftFromEntry(existingEntry));
 
   const chartRows = useMemo(() => buildChartRows(entries, rangeMode, customStart, customEnd, currentToday), [entries, rangeMode, customStart, customEnd, currentToday]);
+  const chartDataRows = useMemo(() => chartRows.filter((row) => !row.isPadding), [chartRows]);
   const feelingCounts = useMemo(() => countTags(entries, chartRows, "feelings"), [entries, chartRows]);
   const eventCounts = useMemo(() => countTags(entries, chartRows, "events"), [entries, chartRows]);
-  const shouldAnimateDayOne = chartRows.length === 1 && typeof chartRows[0]?.composite === "number" && !dayOneAnimationSeen;
+  const shouldAnimateDayOne = chartDataRows.length === 1 && typeof chartDataRows[0]?.composite === "number" && !dayOneAnimationSeen;
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -787,8 +858,6 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <CrisisSupport />
-
       <header className="mobile-header">
         <button className="menu-button" type="button" onClick={() => setMenuOpen((open) => !open)} aria-label="Open menu">
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
@@ -806,6 +875,7 @@ export default function App() {
           <button type="button" onClick={() => { exportPdf(); setMenuOpen(false); }}><Download size={16} /> Export PDF</button>
           <button type="button" onClick={() => importInputRef.current?.click()}><FileText size={16} /> Import QA data</button>
           <input ref={importInputRef} className="hidden-file-input" type="file" accept=".csv,.json,application/json,text/csv" onChange={importEntriesFile} />
+          <div className="menu-support"><h3><LifeBuoy size={16} /> Support resources</h3><p>If you may hurt yourself or someone else, call emergency services now. In the U.S. and Canada, call or text <b>988</b> for crisis support.</p><p>This app is not an emergency service.</p></div>
           <button type="button" onClick={() => { clearEntries(); setMenuOpen(false); }}><Trash2 size={16} /> Clear all local data</button>
           <p>Export is kept here because it matters, but it is not a daily action.</p>
         </section>

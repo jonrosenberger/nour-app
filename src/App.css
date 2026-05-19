@@ -28,6 +28,9 @@ button,input,textarea{font:inherit}
 .menu-panel{border:1px solid var(--border);background:rgba(251,253,249,.96);border-radius:22px;padding:12px;margin:0 0 14px;box-shadow:var(--shadow);display:grid;gap:8px;}
 .menu-panel button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:var(--surface-soft);color:var(--text);border-radius:16px;padding:13px 14px;font-weight:800;cursor:pointer;text-align:left;}
 .menu-panel p{margin:2px 4px 0;color:var(--muted);font-size:13px;line-height:1.35;}
+.menu-support{border:1px solid var(--border);background:rgba(246,250,244,.86);border-radius:16px;padding:12px 14px;}
+.menu-support h3{display:flex;align-items:center;gap:8px;margin:0 0 6px;color:var(--text);font-size:14px;}
+.menu-support p{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.4;}
 .card,.date-row{border:1px solid var(--border);background:rgba(251,253,249,.92);border-radius:var(--radius);padding:clamp(14px,4vw,22px);box-shadow:var(--shadow);color:var(--text);}
 .card h1,.card h2,.card h3{color:var(--text);}
 .card h1,.card h2{margin:0 0 8px;line-height:1.08;}
@@ -37,10 +40,10 @@ button,input,textarea{font:inherit}
 .button:disabled{opacity:.42;cursor:not-allowed}
 .button.primary{background:var(--primary);color:white;box-shadow:0 12px 30px rgba(95,125,104,.25)}
 .button.secondary{background:var(--surface-soft);color:var(--primary-dark);border:1px solid var(--border)}
-.chart-section{width:100vw;position:relative;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw;margin-bottom:14px;overflow:hidden;}
+.chart-section{width:100vw;position:relative;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw;margin-bottom:14px;overflow:visible;}
 .chart-legend-row{padding:12px clamp(14px,4vw,28px) 0;}
 .big-chart-scroll{width:100%;overflow:visible;margin-top:6px;}
-.big-chart{width:100%;height:auto;display:block;min-height:260px;}
+.big-chart{width:100%;height:auto;display:block;}
 .chart-controls-label{font-size:11px;text-transform:uppercase;letter-spacing:.18em;font-weight:850;color:var(--primary-dark);margin:12px 2px 8px;}
 .legend-wrap,.range-buttons,.button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
 .legend,.range-chip{border:1px solid var(--border);background:var(--surface-soft);color:var(--text);border-radius:999px;padding:9px 11px;cursor:pointer;font-size:13px;font-weight:750;}
@@ -125,6 +128,7 @@ textarea{width:100%;min-height:140px;resize:vertical;margin-top:14px;}
   .app-shell{padding-inline:12px;}
   .card,.date-row{border-radius:20px;padding:13px;}
   .big-chart{min-height:240px;}
+  .chart-section{min-height:400px;}
   .legend,.range-chip{font-size:12px;padding:8px 10px;}
   .freq-row{grid-template-columns:76px 1fr 22px;font-size:12px;}
   .range-labels{font-size:10px;}
