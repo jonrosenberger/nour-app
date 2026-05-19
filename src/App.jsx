@@ -331,10 +331,11 @@ function MoodChart({ rows, visible, setVisible, animateDayOne }) {
 
   const series = [
     { key: "composite", label: "Composite", color: "#111827", width: 3.5 },
-    { key: "compositeTrend", label: "Overall path", color: "#b45309", width: 6 },
+    { key: "compositeTrend", label: "Overall path", color: "#b45309", width: 9 },
+
     ...FIELDS.map((field) => ({ key: field.key, label: field.label, color: field.color, width: 2.5 })),
   ];
-
+ 
   const activeSeries = series.filter((item) => (item.key === "compositeTrend" ? visible.trend : visible[item.key]));
   const dayOneRow = rows.length === 1 && typeof rows[0]?.composite === "number" ? rows[0] : null;
   const dayOneX = dayOneRow ? xFor(0) : null;
